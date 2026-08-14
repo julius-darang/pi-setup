@@ -1,0 +1,19 @@
+{
+  "name": "julius-pi-setup",
+  "version": "0.1.0",
+  "description": "Reusable Pi Coding Agent extensions and skills.",
+  "license": "MIT",
+  "keywords": ["pi-package", "pi-coding-agent", "coding-agent", "agent-skills"],
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "diff": "^5.2.0",
+    "linkedom": "^0.16.11",
+    "shell-quote": "^1.8.3",
+    "turndown": "^7.2.0",
+    "unpdf": "^1.4.0"
+  },
+  "pi": {
+    "extensions": ["./extensions"],
+    "skills": ["./skills"]
+  }
+}

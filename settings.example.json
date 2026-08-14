@@ -1,0 +1,7 @@
+{
+  "theme": "dark",
+  "defaultThinkingLevel": "high",
+  "packages": [
+    "npm:pi-web-access"
+  ]
+}

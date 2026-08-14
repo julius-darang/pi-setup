@@ -1,0 +1,3 @@
+# One or more confirmed default recipients, separated by commas or lines.
+# Example:
+# recipient@example.com

@@ -1,0 +1,23 @@
+# Installed dependencies and generated files
+node_modules/
+__pycache__/
+*.pyc
+
+# Local Pi credentials and state
+.env
+.auth.json
+auth.json
+trust.json
+sessions/
+
+# Personal email configuration
+skills/send-email/recipients.txt
+skills/send-email/receiptients.txt
+skills/send-email/.env
+
+# OS/editor files
+.DS_Store
+.vscode/
+.idea/
+
+STATUS.md
