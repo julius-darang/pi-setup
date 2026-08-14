@@ -47,13 +47,13 @@ The `researcher` subagent also uses the separately installed `pi-web-access` pac
 After publishing this repository, install it with:
 
 ```bash
-pi install git:github.com/YOUR-USERNAME/pi-setup
+pi install git:github.com/julius-darang/pi-setup
 ```
 
 Pin a release or commit for reproducibility:
 
 ```bash
-pi install git:github.com/YOUR-USERNAME/pi-setup@v0.1.0
+pi install git:github.com/julius-darang/pi-setup@v0.1.0
 ```
 
 Then install the web-access dependency:
@@ -67,7 +67,7 @@ pi install npm:pi-web-access
 This installs the extensions and skills into the global Pi directory (`~/.pi/agent/` by default), installs their npm dependencies, and installs `pi-web-access` if it is missing.
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/pi-setup.git
+git clone https://github.com/julius-darang/pi-setup.git
 cd pi-setup
 ./install.sh
 ```
