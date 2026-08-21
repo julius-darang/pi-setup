@@ -1,8 +1,8 @@
 ---
 marp: true
-paginate: true
+paginate: false
 html: true
-size: 4:3
+theme: default
 style: |
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=STIX+Two+Text:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap');
 
@@ -14,7 +14,7 @@ style: |
     --subtle:      #a7a6a1;
     --muted:       #85847f;
     --faint:       #4e4e4a;
-    --bg:          #121313;
+    --bg:          #131414;
     --card-border: #2a2a28;
   }
 
@@ -33,7 +33,7 @@ style: |
   }
 
   h1 {
-    font-size: 40px;
+    font-size: 68px;
     font-weight: 600;
     line-height: 1.12;
     margin: 0 0 16px 0;
@@ -41,7 +41,7 @@ style: |
     letter-spacing: 0;
   }
   h2 {
-    font-size: 28px;
+    font-size: 46px;
     font-weight: 600;
     line-height: 1.15;
     margin: 0 0 18px 0;
@@ -50,7 +50,7 @@ style: |
     border: none;
   }
   p {
-    font-size: 17px;
+    font-size: 29px;
     line-height: 1.65;
     color: var(--subtle);
     margin: 0 0 14px 0;
@@ -75,11 +75,11 @@ style: |
   }
   .header-row h2 {
     margin: 0;
-    font-size: 30px;
+    font-size: 50px;
   }
   .page-num {
     font-family: var(--mono);
-    font-size: 30px;
+    font-size: 50px;
     line-height: 1.15;
     color: var(--muted);
     letter-spacing: 0;
@@ -90,7 +90,7 @@ style: |
     flex-direction: column;
     gap: 10px;
     width: 100%;
-    max-width: 720px;
+    max-width: 960px;
     margin: 0 auto 16px;
   }
   .card-row {
@@ -105,20 +105,20 @@ style: |
   }
   .card-row-letter {
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 20px;
     color: var(--muted);
     flex-shrink: 0;
     margin-top: 1px;
     min-width: 16px;
   }
   .card-row-body h3 {
-    font-size: 16px;
+    font-size: 26px;
     font-weight: 600;
     color: var(--white);
     margin: 0 0 3px;
   }
   .card-row-body p {
-    font-size: 15px;
+    font-size: 25px;
     color: var(--subtle);
     margin: 0;
     line-height: 1.45;
@@ -129,7 +129,7 @@ style: |
     flex-direction: column;
     gap: 9px;
     width: 100%;
-    max-width: 720px;
+    max-width: 960px;
     margin: 0 auto 16px;
   }
   .list-item {
@@ -143,13 +143,13 @@ style: |
   }
   .list-num {
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 20px;
     color: var(--muted);
     flex-shrink: 0;
     margin-top: 1px;
     min-width: 18px;
   }
-  .list-text { font-size: 16px; color: var(--subtle); line-height: 1.45; }
+  .list-text { font-size: 26px; color: var(--subtle); line-height: 1.45; }
   .list-text strong { color: var(--white); }
 
   section.cover {
@@ -163,25 +163,25 @@ style: |
     flex-direction: column;
     align-items: center;
     width: 100%;
-    max-width: 720px;
+    max-width: 960px;
   }
   .cover-kicker,
   .cta-kicker {
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 20px;
     color: var(--muted);
     letter-spacing: 3px;
     text-transform: uppercase;
     margin-bottom: 24px;
   }
   section.cover h1 {
-    font-size: 58px;
+    font-size: 96px;
     line-height: 1.05;
     margin-bottom: 18px;
   }
   section.cover p {
-    max-width: 620px;
-    font-size: 20px;
+    max-width: 820px;
+    font-size: 34px;
     color: var(--subtle);
     margin-bottom: 20px;
   }
@@ -190,7 +190,7 @@ style: |
     flex-direction: column;
     gap: 6px;
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 20px;
     color: var(--muted);
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -201,8 +201,8 @@ style: |
     border-left: 5px solid var(--off-white);
     background: #171817;
   }
-  section.divider h1 { font-size: 42px; color: var(--white); margin-bottom: 10px; }
-  section.divider p  { font-size: 15px; color: var(--muted); }
+  section.divider h1 { font-size: 70px; color: var(--white); margin-bottom: 10px; }
+  section.divider p  { font-size: 25px; color: var(--muted); }
 
   section.cta {
     justify-content: center;
@@ -210,34 +210,30 @@ style: |
     text-align: center;
     background: #e9e9e5;
   }
-  section.cover::after,
-  section.cta::after {
-    display: none !important;
-  }
   .cta-content {
     display: flex;
     flex-direction: column;
     align-items: center;
     width: 100%;
-    max-width: 720px;
+    max-width: 960px;
   }
   section.cta h1 {
     color: #171716;
-    font-size: 44px;
+    font-size: 68px;
     line-height: 1.1;
     letter-spacing: 0;
     margin-bottom: 24px;
   }
   .cta-line {
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 21px;
     color: #65645f;
     letter-spacing: 1px;
     margin-bottom: 4px;
   }
   section.cta .handle {
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 21px;
     color: #555550;
     margin-top: 22px;
     letter-spacing: 2px;
@@ -247,18 +243,7 @@ style: |
   section > .header-row,
   section > h2 {
     width: 100%;
-    max-width: 720px;
-  }
-
-  section::after {
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--muted);
-    letter-spacing: 1px;
-    content: 'PI CODING AGENT · ' attr(data-marpit-pagination) ' / ' attr(data-marpit-pagination-total);
-    position: absolute;
-    bottom: 20px;
-    right: 40px;
+    max-width: 960px;
   }
 ---
 

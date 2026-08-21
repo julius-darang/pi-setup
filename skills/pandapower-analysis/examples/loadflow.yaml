@@ -1,0 +1,6 @@
+analysis: loadflow
+validation: preliminary
+
+loadflow:
+  algorithm: nr
+  calculate_voltage_angles: auto
