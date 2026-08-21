@@ -69,7 +69,7 @@ Each entry defines a Roman numeral, title, description, and the Markdown heading
 3. **Automation and Customization** — print, JSON, RPC, skills, extensions, and packages
 4. **Integration and Shipping** — custom models, SDK, sandboxing, capstone, and operations
 
-The build script injects a temporary `\partpage{...}` marker before each configured heading. `_pdf-header.tex` renders that marker as a full-page dark divider and adds a table-of-contents entry and PDF bookmark. The source Markdown and Marp decks remain free of PDF-only LaTeX.
+The build script injects a temporary `\partpage{...}` marker before each configured heading. `_pdf-header.tex` renders that marker as a full-page dark divider and adds a table-of-contents entry and PDF bookmark. The source Markdown and Marp decks remain free of PDF-only part markers. Intentional text-first visual macro calls are documented below and may be used in the canonical Markdown when the Pandoc PDF is the intended output.
 
 When changing the part boundaries:
 
@@ -158,6 +158,22 @@ Use the shared tutorial visual language rather than inventing a separate brand s
 - Monospace commands and code
 
 The current PDF uses A4 pages, a dark cover, orange headings, restrained typography, a table of contents, page headers, footers, and page numbers. Keep body pages readable on paper and on screen; do not copy a slide layout into the PDF.
+
+## Visual components for vertical PDFs
+
+When a long-form tutorial needs a diagram or visual explanation, use native LaTeX components rather than copying Marp HTML/CSS. Pandoc does not reliably carry Marp layout rules into XeLaTeX.
+
+Preferred approach:
+
+1. Define reusable visual macros in `_pdf-header.tex` or a dedicated local `.tex` file included by the header.
+2. Build diagrams from searchable LaTeX primitives such as `\fcolorbox`, `\parbox`, `\tabular`, `\color`, and spacing—not raster screenshots.
+3. Keep the macro definitions in the header; put only short macro calls such as `\pimentalmodel` or `\pigate` at the relevant point in the canonical Markdown.
+4. Use the existing PDF palette, typography, and page width. Do not introduce slide-sized canvases, absolute positioning, or a second visual system.
+5. Keep labels concise and text-first so the visual remains selectable, searchable, printable, and accessible in the PDF.
+
+Use a reusable macro for a visual pattern that appears more than once. For a one-off simple relationship, a Markdown table, blockquote, or short list may be clearer than adding a new macro. Keep PDF-only part-divider injection separate from visual macro calls: part markers belong in the temporary build input, while intentional visuals may live in the canonical source when they are part of the tutorial's explanation.
+
+After adding visuals, rebuild and inspect the pages around each insertion. Check for orphaned diagrams at the top or bottom of a page, excessive whitespace, clipped boxes, unreadable code, and broken table-of-contents or page furniture. Use both `pdftotext` to confirm that labels survived and `pdftoppm` to inspect the actual layout.
 
 ## Source preparation
 

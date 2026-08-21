@@ -23,6 +23,8 @@ This repository is a **capability layer**, not a complete Pi installation. It ad
 | Skill | Purpose |
 |---|---|
 | `marp-output` | Author, render, and validate Marp decks |
+| `ffmpeg-output` | Stitch images or rendered Marp slides into silent MP4 clips |
+| `pandapower-analysis` | Run preliminary load flow, load-profile, and IEC 60909 short-circuit studies |
 | `pandoc-pdf` | Produce flowing book-like PDFs with Pandoc and XeLaTeX |
 | `send-email` | Compose, preview, and explicitly confirm Gmail SMTP messages |
 | `tutorial-content` | Structure canonical long-form tutorial content |
@@ -38,7 +40,9 @@ The `researcher` subagent also uses the separately installed `pi-web-access` pac
 - A configured Pi provider or subscription
 - Optional: `pi-web-access` for the researcher agent
 - Optional: Pandoc and XeLaTeX for `pandoc-pdf`
-- Optional: Marp CLI and its browser backend for `marp-output`
+- Optional: Marp CLI and its browser backend for `marp-output` or Markdown input to `ffmpeg-output`
+- Optional: FFmpeg and `ffprobe` for `ffmpeg-output`
+- Optional: a user-managed Python environment with `pandapower`, `pandas`, `PyYAML`, and `matplotlib` for `pandapower-analysis`
 
 ## Installation
 

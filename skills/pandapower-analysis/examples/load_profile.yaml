@@ -1,0 +1,6 @@
+analysis: load_profile
+validation: preliminary
+
+profile:
+  path: profile.csv
+  timestamp_column: timestamp

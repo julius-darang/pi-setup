@@ -23,39 +23,39 @@ style: |
     font-family: var(--body);
     background: var(--bg);
     color: var(--black);
-    padding: 64px 88px 72px;
+    padding: 176px 96px 92px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     overflow: hidden;
     position: relative;
     border-radius: 0;
   }
 
   h1 {
-    font-size: 40px;
+    font-size: 48px;
     font-weight: 700;
-    line-height: 1.12;
-    margin: 0 0 16px 0;
+    line-height: 1.08;
+    margin: 0 0 20px 0;
     color: var(--black);
     letter-spacing: -0.01em;
   }
   h2 {
-    font-size: 28px;
+    font-size: 36px;
     font-weight: 700;
-    line-height: 1.15;
-    margin: 0 0 18px 0;
+    line-height: 1.1;
+    margin: 0 0 24px 0;
     color: var(--black);
     letter-spacing: -0.01em;
     border: none;
   }
   p {
-    font-size: 17px;
-    line-height: 1.65;
+    font-size: 20px;
+    line-height: 1.5;
     color: var(--subtle);
-    margin: 0 0 14px 0;
+    margin: 0 0 16px 0;
   }
   strong { color: var(--black); font-weight: 600; }
   em     { color: var(--accent); font-style: normal; }
@@ -72,16 +72,16 @@ style: |
     display: flex;
     justify-content: flex-start;
     align-items: baseline;
-    gap: 20px;
-    margin-bottom: 28px;
+    gap: 24px;
+    margin-bottom: 36px;
   }
   .header-row h2 {
     margin: 0;
-    font-size: 30px;
+    font-size: 36px;
   }
   .page-num {
     font-family: var(--mono);
-    font-size: 26px;
+    font-size: 30px;
     line-height: 1.15;
     color: var(--accent);
     letter-spacing: 0;
@@ -90,37 +90,37 @@ style: |
   .cards-col {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 18px;
     width: 100%;
-    max-width: 720px;
-    margin: 0 auto 16px;
+    max-width: 880px;
+    margin: 0 auto 24px;
   }
   .card-row {
     background: transparent;
     border: none;
     border-left: 2px solid var(--accent);
     border-radius: 0;
-    padding: 0 0 0 18px;
+    padding: 0 0 0 22px;
     display: flex;
     align-items: flex-start;
-    gap: 14px;
+    gap: 18px;
   }
   .card-row-letter {
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 14px;
     color: var(--accent);
     flex-shrink: 0;
-    margin-top: 1px;
-    min-width: 16px;
+    margin-top: 2px;
+    min-width: 20px;
   }
   .card-row-body h3 {
-    font-size: 16px;
+    font-size: 20px;
     font-weight: 600;
     color: var(--black);
-    margin: 0 0 3px;
+    margin: 0 0 6px;
   }
   .card-row-body p {
-    font-size: 15px;
+    font-size: 18px;
     color: var(--subtle);
     margin: 0;
     line-height: 1.45;
@@ -129,15 +129,15 @@ style: |
   .list {
     display: flex;
     flex-direction: column;
-    gap: 9px;
+    gap: 16px;
     width: 100%;
-    max-width: 720px;
-    margin: 0 auto 16px;
+    max-width: 880px;
+    margin: 0 auto 24px;
   }
   .list-item {
     display: flex;
     align-items: flex-start;
-    gap: 16px;
+    gap: 20px;
     background: transparent;
     border: none;
     border-radius: 0;
@@ -145,19 +145,19 @@ style: |
   }
   .list-num {
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 14px;
     color: var(--accent);
     flex-shrink: 0;
-    margin-top: 1px;
-    min-width: 18px;
+    margin-top: 3px;
+    min-width: 22px;
   }
-  .list-text { font-size: 16px; color: var(--subtle); line-height: 1.45; }
+  .list-text { font-size: 20px; color: var(--subtle); line-height: 1.45; }
   .list-text strong { color: var(--black); }
 
   section.cover {
     justify-content: center;
     text-align: center;
-    padding-bottom: 72px;
+    padding: 64px 96px 92px;
     background: #fbfaf7;
   }
   .cover-content {
@@ -165,34 +165,34 @@ style: |
     flex-direction: column;
     align-items: center;
     width: 100%;
-    max-width: 720px;
+    max-width: 900px;
   }
   .cover-kicker,
   .cta-kicker {
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 14px;
     color: var(--accent);
     letter-spacing: 3px;
     text-transform: uppercase;
-    margin-bottom: 24px;
+    margin-bottom: 30px;
   }
   section.cover h1 {
-    font-size: 58px;
-    line-height: 1.05;
-    margin-bottom: 18px;
+    font-size: 72px;
+    line-height: 1.02;
+    margin-bottom: 24px;
   }
   section.cover p {
-    max-width: 620px;
-    font-size: 20px;
+    max-width: 760px;
+    font-size: 24px;
     color: var(--subtle);
-    margin-bottom: 20px;
+    margin-bottom: 28px;
   }
   .cover-meta {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     font-family: var(--mono);
-    font-size: 12px;
+    font-size: 14px;
     color: var(--muted);
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -203,8 +203,8 @@ style: |
     border-left: 5px solid var(--accent);
     background: #f1efe9;
   }
-  section.divider h1 { font-size: 42px; color: var(--black); margin-bottom: 10px; }
-  section.divider p  { font-size: 15px; color: var(--muted); }
+  section.divider h1 { font-size: 52px; color: var(--black); margin-bottom: 16px; }
+  section.divider p  { font-size: 18px; color: var(--muted); }
 
   section.cta {
     justify-content: center;
@@ -221,46 +221,178 @@ style: |
     flex-direction: column;
     align-items: center;
     width: 100%;
-    max-width: 720px;
+    max-width: 900px;
   }
   section.cta h1 {
     color: #f7f6f2;
-    font-size: 44px;
+    font-size: 56px;
     line-height: 1.1;
     letter-spacing: -0.01em;
     margin-bottom: 24px;
   }
   .cta-line {
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 15px;
     color: var(--accent);
     letter-spacing: 1px;
     margin-bottom: 4px;
   }
   section.cta .handle {
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 15px;
     color: #a7a6a1;
     margin-top: 22px;
     letter-spacing: 2px;
     text-transform: uppercase;
   }
 
+  section.split-slide {
+    padding-top: 140px;
+  }
+  section.split-slide > .header-row,
+  section.split-slide > .cards-col,
+  section.split-slide > .list {
+    width: 54%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: auto;
+  }
+  section.split-slide > .header-row {
+    margin-bottom: 36px;
+  }
+  section.split-slide > .cards-col,
+  section.split-slide > .list {
+    margin-bottom: 24px;
+  }
+  .visual-panel {
+    position: absolute;
+    top: 140px;
+    right: 96px;
+    width: 36%;
+    max-width: 410px;
+    min-height: 300px;
+    box-sizing: border-box;
+    padding: 24px;
+    background: #fbfaf7;
+    border: 1px solid var(--card-border);
+  }
+  .visual-caption,
+  .visual-flow-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-align: center;
+  }
+  .visual-flow-label {
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-top: 24px;
+  }
+  .flow-core {
+    width: 150px;
+    margin: 20px auto 0;
+    padding: 14px 12px 12px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    background: var(--black);
+    color: var(--bg);
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .flow-core span {
+    display: block;
+    margin-top: 4px;
+    color: var(--faint);
+    font-family: var(--body);
+    font-size: 12px;
+    font-weight: 400;
+  }
+  .flow-stem {
+    width: 2px;
+    height: 24px;
+    margin: 0 auto;
+    background: var(--faint);
+  }
+  .flow-tools {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    align-items: start;
+  }
+  .flow-tool {
+    position: relative;
+    padding: 14px 4px 12px;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    color: var(--black);
+    font-family: var(--mono);
+    font-size: 13px;
+    text-align: center;
+  }
+  .flow-tool::before {
+    content: '↓';
+    display: block;
+    margin: -27px 0 8px;
+    color: var(--accent);
+    font-family: var(--body);
+    font-size: 18px;
+  }
+  .tradeoff-flow {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-top: 52px;
+  }
+  .tradeoff-step {
+    min-height: 112px;
+    padding: 12px 8px;
+    box-sizing: border-box;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    text-align: center;
+  }
+  .tradeoff-step span {
+    display: block;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-bottom: 14px;
+  }
+  .tradeoff-step strong {
+    display: block;
+    font-size: 14px;
+    line-height: 1.2;
+  }
+  .tradeoff-step small {
+    display: block;
+    margin-top: 10px;
+    color: var(--subtle);
+    font-size: 11px;
+    line-height: 1.2;
+  }
+  .tradeoff-arrow {
+    color: var(--accent);
+    font-size: 22px;
+  }
+
   section > .header-row,
   section > h2 {
     width: 100%;
-    max-width: 720px;
+    max-width: 880px;
   }
 
   section::after {
     font-family: var(--mono);
-    font-size: 9px;
+    font-size: 11px;
     color: var(--accent);
     letter-spacing: 1px;
     content: 'PI CODING AGENT · ' attr(data-marpit-pagination) ' / ' attr(data-marpit-pagination-total);
     position: absolute;
-    bottom: 20px;
-    right: 40px;
+    bottom: 26px;
+    right: 48px;
   }
 ---
 
@@ -281,6 +413,7 @@ style: |
 ---
 
 <!-- SLIDE 2 · WHAT IT IS -->
+<!-- _class: split-slide -->
 
 <div class="header-row">
   <span class="page-num">I.</span>
@@ -311,9 +444,23 @@ style: |
   </div>
 </div>
 
+<div class="visual-panel" aria-label="Pi connected to four tools">
+  <div class="visual-caption">ONE SMALL CORE</div>
+  <div class="flow-core">PI<span>coding agent</span></div>
+  <div class="flow-stem"></div>
+  <div class="flow-tools">
+    <div class="flow-tool">read</div>
+    <div class="flow-tool">write</div>
+    <div class="flow-tool">edit</div>
+    <div class="flow-tool">bash</div>
+  </div>
+  <div class="visual-flow-label">LOCAL RUNTIME · FOUR TOOLS</div>
+</div>
+
 ---
 
 <!-- SLIDE 3 · WHY PI -->
+<!-- _class: split-slide -->
 
 <div class="header-row">
   <span class="page-num">II.</span>
@@ -333,6 +480,18 @@ style: |
     <span class="list-num">03</span>
     <span class="list-text"><strong>More extensible</strong> — add capabilities only when needed</span>
   </div>
+</div>
+
+<div class="visual-panel" aria-label="Flow from less built in to more control and more extensibility">
+  <div class="visual-caption">THE TRADE-OFF</div>
+  <div class="tradeoff-flow">
+    <div class="tradeoff-step"><span>01</span><strong>Less built in</strong><small>fewer defaults</small></div>
+    <div class="tradeoff-arrow">→</div>
+    <div class="tradeoff-step"><span>02</span><strong>More control</strong><small>choose boundaries</small></div>
+    <div class="tradeoff-arrow">→</div>
+    <div class="tradeoff-step"><span>03</span><strong>More extensible</strong><small>add as needed</small></div>
+  </div>
+  <div class="visual-flow-label">SIMPLER CORE → GREATER AGENCY</div>
 </div>
 
 ---

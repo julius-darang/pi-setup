@@ -1,253 +1,144 @@
 ---
 name: marp-output
-description: Author, structure, style, render, and validate Marp decks. Use for presentations, carousels, tutorial decks, and other Markdown files rendered with Marp; choose a descriptive named template and its local reference when one exists.
+description: Create, adapt, render, and validate fixed-page Marp decks using the named templates in `reference/`.
 ---
 
 # Marp Output
 
-A standalone workflow for creating fixed-page Marp decks: choose the output profile, select a visual template, adapt the content, render the deck, and inspect the result.
+Workflow: inspect the source and assets → choose a profile and template → adapt the content → render outside the repository → inspect and validate.
 
-All concrete template references used by this skill live in this skill's own `reference/` directory. This document defines the workflow and the stable template contracts; the reference files provide the complete Marp frontmatter, CSS, and representative markup.
+The self-contained references in `reference/` are the implementation authority for frontmatter, CSS, layout primitives, typography, palette, and page furniture. A deck is an adaptation of source content, not the source of truth for long-form prose.
 
-## Scope
+## Decide before editing
 
-Use this skill for fixed-page Marp outputs:
+Inspect the target deck, source content, and intentionally used local assets. Infer decisions from the task and existing deck. Ask one question at a time only when an unresolved choice materially changes the output, in this order:
 
-- Presentations
-- Social carousels
-- Tutorial decks
-- Visual walkthroughs
-- Technical reference decks
-
-This skill does not define the canonical source prose for a long-form publication, and it does not generate flowing book-like PDFs. Treat those as separate editorial outputs. A Marp deck is an adaptation of source content, not automatically the source of truth for another output.
-
-## Decision protocol
-
-Before editing, inspect the target deck, its source content, and any local assets that the deck intentionally uses. Infer decisions from the task and existing deck whenever possible.
-
-Ask the user only when an unresolved decision materially changes the output. Ask one question at a time, in this order:
-
-1. **Output profile** — presentation, carousel, vertical carousel, print/reference deck, or custom.
-2. **Visual template** — `template-1`, `template-2`, `template-3`, or custom.
-3. **Deliverables** — source only, PDF, image preview, or a combination.
-4. **Audience, length, or CTA** — only when the structure cannot be inferred.
-
-Do not ask for information already present in the task or target files.
+1. Output profile — presentation, carousel, vertical carousel, print/reference, or custom.
+2. Visual template — `template-1`, `template-2`, `template-3`, or custom.
+3. Deliverables — source, PDF, previews, or a combination.
+4. Audience, length, or CTA — only when structure cannot be inferred.
 
 ### Defaults
 
 | Situation | Default |
 |---|---|
-| Generic technical presentation | 4:3, `template-1` |
-| Dark instructional or tutorial deck | 4:3, `template-2` |
-| Light instructional or tutorial deck | 16:9, explicitly selected `template-3` |
-| Existing deck with a deliberate format | Preserve its profile and selected template |
-| Unspecified deliverable | Preserve the source and render a PDF for verification |
-| Visual inspection | Render image previews into `/tmp` or another ignored directory |
+| Generic technical presentation | 16:9, `template-1` |
+| Dark instructional/tutorial deck | 4:3, `template-2` |
+| Light instructional/tutorial deck | 16:9, explicitly selected `template-3` |
+| Existing deck with a deliberate profile | Preserve it unless conversion is requested |
+| Unspecified deliverable | Preserve source; render a PDF for verification |
+| Visual inspection | Render previews into `/tmp` or another ignored directory |
 
-Do not infer a template from a project or brand name. Choose based on the intended visual treatment and the existing deck.
+Do not infer a template from a project or brand name. Do not silently change aspect ratio or page size.
 
-## Output profiles
+## Profiles and authoring
 
-Choose the smallest profile that matches the request:
+Choose the smallest suitable profile: **presentation** (selected template dimensions), **carousel** (usually 4:5), **vertical carousel** (usually 9:16), **print/reference** (selected reference or request), **progressive** (duplicated static states), or **custom** (ask for dimensions and use).
 
-- **Presentation** — use the selected template's dimensions; do not assume 16:9.
-- **Carousel** — usually 4:5; concise cards for social/tutorial use.
-- **Vertical carousel** — usually 9:16; mobile-first cards.
-- **Print/reference deck** — dimensions and typography defined by the selected reference or explicit request.
-- **Custom** — ask for dimensions and intended use.
+Identify whether the source is long-form prose, a concise/expanded deck, a generated artifact, or a template. For editorial tutorials: `source prose → adapted Marp deck → rendered fixed-page output`. Never edit a generated PDF as source or copy a full prose chapter into slides without adaptation.
 
-Do not silently change aspect ratio or page size. If an existing deck has a deliberate format, preserve it unless the user asks for a conversion.
+A typical tutorial arc is: cover → orientation → core concepts → early demonstration → bounded practice → safety/constraints → recap → references or CTA. Combine or omit sections when the profile calls for it; do not force a fixed slide count.
 
-## Source and authoring workflow
+Write for slides:
 
-### 1. Identify the source
+- One dominant idea per slide; use short headings and compact explanations.
+- Show the result, decision, command, or visual before extended explanation.
+- Prefer one column; use two only for a useful comparison or sequence.
+- Keep code examples small and legible; preserve factual distinctions and safety warnings.
+- Split crowded slides instead of shrinking type.
+- Do not fabricate screenshots, output, links, capabilities, or decorative hype.
 
-Determine whether the target is:
+## Progressive slide states
 
-- Canonical long-form Markdown
-- A concise deck
-- An expanded deck
-- A generated PDF or image
-- A template/reference deck
+For click-by-click or part-by-part reveals compatible with PDF, PNG, and PPTX, duplicate complete static slide states; do not use CSS animation.
 
-For editorial tutorials, use this relationship:
+Keep repeated states geometrically fixed. Do not vertically center variable-height lists or card groups: later additions will move earlier content. Prefer a dedicated class:
 
-```text
-source prose → adapted Marp deck → rendered fixed-page output
+```css
+section.progressive-state {
+  justify-content: flex-start;
+  padding-top: 184px; /* adjust for the template and page size */
+}
 ```
 
-Do not edit a generated PDF as if it were source content. Do not copy a full prose chapter into slides without adapting it.
+For an existing deck without a progressive class, preserve centered cover and CTA slides with:
 
-### 2. Build the narrative
+```css
+section:not(.cover):not(.cta) {
+  justify-content: flex-start;
+  padding-top: 184px;
+}
+```
 
-A tutorial or explanatory deck will usually benefit from:
+Keep heading, container, item order, spacing, and layout mode identical across states; append only newly revealed items. Use a separate progressive deck when the concise deck is also distributed as a carousel or single-page PDF.
 
-1. Cover — title, promise, and identity
-2. Orientation — what the audience will understand or build
-3. Core concepts — one clear idea per slide
-4. Demonstration — show a useful result early
-5. Workflow or practice — give a bounded next action
-6. Safety and constraints — explain where judgment remains necessary
-7. Recap — checklist or decision rule
-8. References or CTA — one clear next step
+Validate first, intermediate, final, and densest states side by side. Confirm stable coordinates for existing content, no bottom clipping, and page count/pagination appropriate to the selected template. (`template-1` intentionally has no pagination.)
 
-A short carousel may combine or omit sections. A technical reference deck may prioritize orientation, reference sections, and a final checklist. Do not force every deck into the same slide count.
+## Templates
 
-### 3. Write for slides
-
-- Keep one dominant idea per slide.
-- Show the result, decision, or useful command before a long explanation.
-- Prefer short headings, compact explanations, and one visual or code example.
-- Use generous margins and deliberate whitespace.
-- Split crowded slides instead of shrinking text until it becomes unreadable.
-- Use one column by default; use two columns only when comparison or sequencing improves comprehension.
-- Keep code examples small and legible.
-- Preserve factual distinctions and safety warnings from the source.
-- Do not fabricate screenshots, command output, links, or product capabilities.
-- Avoid generic hype, filler, and decorative complexity.
-
-## Visual templates
-
-Visual design is governed by the `visual-style` skill when it is available. This skill owns the Marp workflow, while `visual-style` owns template contracts, design tokens, and the shared matplotlib system. The local reference files remain the concrete implementation sources.
+When `visual-style` is available, it owns design tokens and visual contracts; this skill owns workflow, authoring, rendering, and QA. Otherwise, read the selected local reference and do not invent a competing style.
 
 | ID | Use | Profile | Reference |
 |---|---|---|---|
-| `template-1` | Pi Agent editorial and generic technical decks | 4:3 | `reference/template-1.md` |
+| `template-1` | Pi Agent editorial and generic technical decks; pagination disabled; progressive variant supported | 16:9 (default) | `reference/template-1.md` |
 | `template-2` | Dark Polymath instructional decks | 4:3 | `reference/template-2.md` |
-| `template-3` | Explicitly light instructional decks | 16:9 by default | `reference/template-3.md` |
+| `template-3` | Explicitly light instructional decks | 16:9 (default) | `reference/template-3.md` |
 
-When `visual-style` is not loaded, read the selected reference relative to this skill directory and preserve its frontmatter, CSS, layout primitives, typography, palette, and pagination behavior. Do not invent a competing style from memory.
+For named templates:
 
-### Skill handoff
+- Copy the selected reference’s frontmatter and CSS structure; reuse its primitives and cover/CTA treatment.
+- Replace example content; do not treat reference prose as canonical.
+- Preserve page furniture, pagination, contrast, fonts, variables, and palette.
+- Add a focused class for a genuinely new layout; do not copy in a second style system.
+- Preserve a deliberate custom style unless conversion is requested.
 
-| Concern | Owner |
+## Frontmatter and runtime
+
+Marp CLI and its browser backend are required. References import web fonts with fallbacks; offline rendering may differ. Review local assets before using `--allow-local-files`.
+
+Every deck begins with Marp frontmatter containing `marp: true`; set `paginate` deliberately because the selected reference may require `false`.
+
+Preserve the selected reference’s additional frontmatter:
+
+| Template | Required profile/frontmatter |
 |---|---|
-| Template IDs, design tokens, and visual contracts | `visual-style` |
-| Narrative structure and slide authoring | `marp-output` |
-| CSS/frontmatter implementation | Selected reference file |
-| Marp rendering and output paths | `marp-output` |
-| Visual inspection and output validation | `marp-output` |
+| `template-1` | `html: true`, `theme: default`, default 16:9, `paginate: false`, no page-number footer |
+| `template-2` | `html: true`, `size: 4:3` |
+| `template-3` | `html: true`, `theme: default`, default 16:9 |
 
-## Template discipline
-
-When using one of the named templates:
-
-- Use the selected template's local reference as the implementation source.
-- Copy its frontmatter and CSS structure rather than reconstructing the style from memory.
-- Reuse its layout primitives and cover/CTA structure.
-- Replace the reference deck's example content; do not treat that content as canonical source prose.
-- Preserve required page furniture, pagination behavior, and contrast rules.
-- Add a focused class for a genuinely new layout instead of copying a second full style system.
-- Do not mix palettes, font systems, or CTA treatments between named templates without an explicit design decision.
-- If an existing deck already uses a deliberate custom style, preserve it unless the user asks for a template conversion.
-
-The reference files are self-contained implementation exemplars. They are the only template files required by this skill.
-
-## Runtime requirements
-
-- Marp CLI is required for rendering.
-- PDF output requires the browser backend used by the Marp installation.
-- The references import web fonts and define fallbacks. Offline rendering works with fallback fonts but may differ visually.
-- Local images or other assets are optional and should be reviewed before enabling local-file access.
-
-## Required frontmatter
-
-Every Marp deck must begin with appropriate Marp frontmatter. At minimum:
-
-```yaml
----
-marp: true
-paginate: true
----
-```
-
-Preserve the selected reference's additional frontmatter:
-
-### Templates 1 and 2
-
-```yaml
-html: true
-size: 4:3
-```
-
-Also preserve the reference's font imports, pagination setting, and CSS variables.
-
-### Template 3
-
-```yaml
-html: true
-theme: default
-```
-
-Template 3 intentionally uses Marp's default 16:9 size. Do not add `size: 4:3` unless the user explicitly requests a profile conversion.
-
-Do not put Marp frontmatter or slide separators into canonical long-form Markdown.
+Do not add `size: 4:3` to templates 1 or 3 unless explicitly converting the profile. Do not put Marp frontmatter or slide separators in canonical long-form Markdown.
 
 ## Rendering
 
-Render from the directory containing the target deck or pass an explicit path. Always use an explicit output path outside the source directory:
-
-```bash
-marp <deck>.md --pdf --output /tmp/<deck>.pdf
-```
-
-For image previews:
-
-```bash
-marp <deck>.md --images png --output /tmp/<deck>-preview
-```
-
-If another artifact uses the same basename, never let Marp write beside the source deck. Use an unambiguous output name such as:
+Render from the deck’s directory or pass an explicit path. Always write outside the source directory:
 
 ```bash
 marp <deck>.md --pdf --output /tmp/<deck>-marp.pdf
+marp <deck>.md --images png --output /tmp/<deck>-preview
 ```
 
-Use `--allow-local-files` only when the deck intentionally references reviewed local assets.
+Use `--allow-local-files` only for reviewed local assets. Keep generated files in `/tmp` or another ignored path.
 
-Keep generated previews outside the repository or in an ignored output path unless the project explicitly requires committed output.
+## Validation
 
-## Validation and visual inspection
+Before completion, verify:
 
-Before declaring the work complete:
+- `marp: true`, selected profile, page size, template, frontmatter, and pagination are correct.
+- Cover, closing/CTA, densest slide, and code/install slide (when present) are readable.
+- No clipping, overflow, overlap, weak contrast, or illegible code exists at output size.
+- Links and commands are accurate; no private paths, credentials, session content, or secrets entered the deck.
+- Required watermarks, pagination, and page furniture are present—or intentionally absent.
 
-- Confirm frontmatter includes `marp: true`.
-- Confirm the selected profile and page size are correct.
-- Confirm the selected template is used consistently.
-- Confirm cover and closing/CTA slides are readable.
-- Inspect the densest content slide.
-- Inspect the code or installation slide when present.
-- Inspect the final slide.
-- Check for clipping, overflow, weak contrast, and accidental overlap.
-- Check that code is legible at the final output size.
-- Check that links and commands are accurate.
-- Check required watermarks, pagination, and page furniture.
-- Check that no private paths, credentials, session content, or secrets entered the deck.
-- If `pdfinfo` is available, inspect PDF metadata and dimensions:
+Use image previews for visual QA; a successful Marp exit status is not enough. If available, inspect PDF metadata:
 
 ```bash
-pdfinfo /tmp/<deck>.pdf | grep -E 'Pages|Page size|Title|Author'
+pdfinfo /tmp/<deck>-marp.pdf | grep -E 'Pages|Page size|Title|Author'
 ```
-
-Use image previews for visual QA; do not rely on successful Marp exit status alone.
 
 ## Completion contract
 
-A completed Marp task should leave:
-
-1. The correct source Markdown edited or preserved.
-2. A coherent deck narrative for the selected profile.
-3. One selected visual template applied consistently.
-4. A rendered output or an explicit explanation of why rendering was not possible.
-5. Visual inspection of representative slides.
-6. No generated clutter or temporary files in the repository unless explicitly requested.
-7. Clear follow-up information when another output must be rebuilt separately.
+A task is complete only when the correct source is edited or preserved, the narrative fits the selected profile, one template is applied consistently, output is rendered (or failure is explained), representative slides are visually inspected, and no generated clutter remains in the repository. State any separate artifact that must be rebuilt.
 
 ## Extension points
 
-- Add a small number of named layout classes for genuinely different slide types.
-- Add a new reference file only when there is a concrete visual use case.
-- A new reference must include complete frontmatter, concrete CSS, representative cover/content/closing markup, supported dimensions, and known pagination behavior.
-- Update this skill's template registry whenever a new reference is added.
-- Add scripts only when rendering or validation becomes repeatable enough to justify them.
+Add only a small number of focused layout classes. Add a reference only for a concrete visual use case; it must include complete frontmatter, CSS, representative cover/content/closing markup, dimensions, and pagination behavior, and must be added to the registry. Add scripts only when rendering or validation is repeatable enough to justify them.

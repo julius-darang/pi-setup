@@ -1,0 +1,6 @@
+analysis: short_circuit
+validation: preliminary
+
+short_circuit:
+  fault: 3ph
+  cases: [max, min]
