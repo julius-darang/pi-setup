@@ -65,6 +65,19 @@ async function readTextOrNull(absPath: string): Promise<string | null> {
 	}
 }
 
+type FileState =
+	| { content: string | null; error?: undefined }
+	| { content?: undefined; error: string };
+
+async function readFileState(absPath: string): Promise<FileState> {
+	try {
+		return { content: await readFile(absPath, "utf-8") };
+	} catch (error: any) {
+		if (error?.code === "ENOENT") return { content: null };
+		return { error: error?.message ?? String(error) };
+	}
+}
+
 function countDiffLines(unifiedDiff: string): { added: number; removed: number } {
 	let added = 0;
 	let removed = 0;
@@ -263,7 +276,7 @@ export default function (pi: ExtensionAPI) {
 		if (ctx.hasUI && !force) {
 			const ok = await ctx.ui.confirm(
 				"Decline pi changes?",
-				"This will revert ALL currently logged pi changes (overwrite files / delete created files)."
+				"This will revert logged pi changes (overwrite files / delete created files). Files changed outside pi are left untouched."
 			);
 			if (!ok) return;
 		} else if (!ctx.hasUI && !force) {
@@ -272,9 +285,32 @@ export default function (pi: ExtensionAPI) {
 
 		const items = [...tracked.values()].sort((a, b) => b.updatedAt - a.updatedAt);
 		let reverted = 0;
-		const errors: string[] = [];
+		const issues: string[] = [];
 
 		for (const item of items) {
+			const state = await readFileState(item.absPath);
+			if ("error" in state) {
+				issues.push(`${item.displayPath}: could not inspect current file (${state.error})`);
+				continue;
+			}
+
+			// If the file is already back at its original state, it is safe to
+			// retire the entry without touching the filesystem.
+			if (state.content === item.originalContent) {
+				baselines.delete(item.path);
+				tracked.delete(item.path);
+				pi.appendEntry(ENTRY_UNTRACK, { path: item.path, timestamp: Date.now() });
+				reverted++;
+				continue;
+			}
+
+			// Only undo the exact state last observed after a successful pi tool
+			// call. This prevents a decline from overwriting external edits.
+			if (state.content !== item.currentContent) {
+				issues.push(`${item.displayPath}: changed outside pi since it was logged; left untouched`);
+				continue;
+			}
+
 			try {
 				if (item.originalContent === null) {
 					// created file
@@ -283,25 +319,24 @@ export default function (pi: ExtensionAPI) {
 					await ensureParentDir(item.absPath);
 					await writeFile(item.absPath, item.originalContent, "utf-8");
 				}
+				baselines.delete(item.path);
+				tracked.delete(item.path);
+				pi.appendEntry(ENTRY_UNTRACK, { path: item.path, timestamp: Date.now() });
 				reverted++;
-			} catch (e: any) {
-				errors.push(`${item.displayPath}: ${e?.message ?? String(e)}`);
+			} catch (error: any) {
+				issues.push(`${item.displayPath}: ${error?.message ?? String(error)}`);
 			}
 		}
 
-		await clearLog(ctx, "decline");
-
-		if (ctx.hasUI) {
-			if (errors.length === 0) {
-				ctx.ui.notify(`filechanges: declined changes for ${reverted} file(s).`, "success");
-			} else {
-				ctx.ui.notify(
-					`filechanges: declined with ${errors.length} error(s). Run /filechanges to inspect; see console for details.`,
-					"warning"
-				);
-				console.warn("[filechanges] decline errors:\n" + errors.join("\n"));
-			}
+		updateUi(ctx);
+		if (issues.length === 0) {
+			if (ctx.hasUI) ctx.ui.notify(`filechanges: declined changes for ${reverted} file(s).`, "info");
+			return;
 		}
+
+		const message = `filechanges: declined ${reverted} file(s); kept ${issues.length} file(s) for review. Run /filechanges to inspect.`;
+		if (ctx.hasUI) ctx.ui.notify(message, "warning");
+		console.warn("[filechanges] decline issues:\n" + issues.join("\n"));
 	}
 
 	async function acceptAll(ctx: ExtensionCommandContext) {
@@ -371,7 +406,7 @@ export default function (pi: ExtensionAPI) {
 
 				const selectItems: SelectItem[] = [
 					{ value: "__accept__", label: "Accept changes (clear log)", description: "Keep current files" },
-					{ value: "__decline__", label: "Undo changes (revert)", description: "Restore original contents" },
+					{ value: "__decline__", label: "Undo changes (revert)", description: "Restore originals; keep conflicts" },
 					{ value: "__sep__", label: "────────", description: "" },
 					...items.map((t) => ({
 						value: t.path,
@@ -464,7 +499,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("filechanges-decline", {
-		description: "Decline pi-made changes (reverts files, clears log)",
+		description: "Decline pi-made changes (reverts safe files, retains conflicts)",
 		handler: async (args, ctx) => {
 			(ctx as any).args = parseCommandArgs(args);
 			await declineAll(ctx);
