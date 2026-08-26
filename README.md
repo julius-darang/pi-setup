@@ -68,7 +68,7 @@ pi install npm:pi-web-access
 
 ### Option B: Clone and run the installer
 
-This installs the extensions and skills into the global Pi directory (`~/.pi/agent/` by default), installs their npm dependencies, and installs `pi-web-access` if it is missing.
+This installs the extensions and skills from the checked-out Git `HEAD` into the global Pi directory (`~/.pi/agent/` by default), installs their npm dependencies without lifecycle scripts, and installs `pi-web-access` if it is missing. Only tracked repository files are installed; uncommitted changes and ignored local files such as credentials, recipient lists, and `node_modules` are excluded.
 
 ```bash
 git clone https://github.com/julius-darang/pi-setup.git
