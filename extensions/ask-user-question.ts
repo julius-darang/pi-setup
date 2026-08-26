@@ -526,6 +526,118 @@ async function askMultiChoice(
 	});
 }
 
+// RPC mode supports select/input dialogs but not ctx.ui.custom(). These flows
+// keep the same answer shape while using the portable dialog sub-protocol.
+function rpcQuestionTitle(question: string, context: string | undefined): string {
+	return context ? `${question}\n\n${context}` : question;
+}
+
+function rpcOptionLabel(option: AskOption, index: number): string {
+	const description = option.description ? ` — ${option.description.replace(/\s+/g, " ")}` : "";
+	return `${index + 1}. ${option.label}${description}`;
+}
+
+async function askSingleChoiceRpc(
+	ctx: any,
+	question: string,
+	context: string | undefined,
+	options: AskOption[],
+): Promise<AskAnswer | null> {
+	const otherLabel = getOtherLabel(options);
+	const displayOptions = options.map((option, index) => rpcOptionLabel(option, index));
+	const allOptions = [...displayOptions, otherLabel];
+
+	while (true) {
+		const selected = await ctx.ui.select(rpcQuestionTitle(question, context), allOptions);
+		if (selected === undefined) return null;
+
+		const selectedIndex = displayOptions.indexOf(selected);
+		if (selectedIndex >= 0) {
+			const option = options[selectedIndex];
+			return {
+				type: "option",
+				label: option.label,
+				value: option.value,
+				index: selectedIndex + 1,
+			};
+		}
+
+		if (selected !== otherLabel) return null;
+		const custom = await ctx.ui.input("Other (custom answer)", "Type your answer");
+		if (custom === undefined) continue;
+		const trimmed = custom.trim();
+		if (!trimmed) continue;
+		return { type: "other", label: trimmed, value: trimmed };
+	}
+}
+
+async function askMultiChoiceRpc(
+	ctx: any,
+	question: string,
+	context: string | undefined,
+	options: AskOption[],
+): Promise<AskAnswer[] | null> {
+	const otherLabel = getOtherLabel(options);
+	const selected = new Map<string, AskAnswer>();
+	const title = rpcQuestionTitle(question, context);
+
+	while (true) {
+		const menu: Array<{ key: string; label: string }> = options.map((option, index) => ({
+			key: `option:${index}`,
+			label: `${selected.has(`option:${index}`) ? "✓" : "○"} ${rpcOptionLabel(option, index)}`,
+		}));
+		const custom = selected.get("other");
+		menu.push(
+			custom
+				? { key: "other:remove", label: `✓ ${otherLabel} — ${custom.label} (remove)` }
+				: { key: "other:add", label: `○ ${otherLabel}` },
+		);
+		menu.push({
+			key: "submit",
+			label: selected.size > 0 ? `Submit (${selected.size} selected)` : "Submit",
+		});
+
+		const picked = await ctx.ui.select(title, menu.map((item) => item.label));
+		if (picked === undefined) return null;
+		const item = menu.find((candidate) => candidate.label === picked);
+		if (!item) return null;
+
+		if (item.key === "submit") {
+			if (selected.size > 0) return sortAnswers(Array.from(selected.values()));
+			continue;
+		}
+
+		if (item.key === "other:add") {
+			const answer = await ctx.ui.input("Other (custom answer)", "Type your answer");
+			if (answer === undefined) continue;
+			const trimmed = answer.trim();
+			if (trimmed) selected.set("other", { type: "other", label: trimmed, value: trimmed });
+			continue;
+		}
+
+		if (item.key === "other:remove") {
+			selected.delete("other");
+			continue;
+		}
+
+		const optionMatch = item.key.match(/^option:(\d+)$/);
+		if (!optionMatch) return null;
+		const optionIndex = Number(optionMatch[1]);
+		const option = options[optionIndex];
+		if (!option) return null;
+		if (selected.has(item.key)) {
+			selected.delete(item.key);
+		} else {
+			selected.set(item.key, {
+				type: "option",
+				label: option.label,
+				value: option.value,
+				index: optionIndex + 1,
+			});
+		}
+	}
+}
+
 // Mutex to serialize concurrent UI interactions.
 // showExtensionCustom/editor can only handle one active call at a time.
 let uiLock: Promise<void> = Promise.resolve();
@@ -582,14 +694,18 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 				}
 
 				if (mode === "single-select") {
-					const answer = await askSingleChoice(ctx, params.question, context, options);
+					const answer = ctx.mode === "tui"
+						? await askSingleChoice(ctx, params.question, context, options)
+						: await askSingleChoiceRpc(ctx, params.question, context, options);
 					if (!answer) {
 						return cancelledResult(params.question, mode, context);
 					}
 					return buildResult(params.question, context, mode, [answer]);
 				}
 
-				const answers = await askMultiChoice(ctx, params.question, context, options);
+				const answers = ctx.mode === "tui"
+					? await askMultiChoice(ctx, params.question, context, options)
+					: await askMultiChoiceRpc(ctx, params.question, context, options);
 				if (!answers) {
 					return cancelledResult(params.question, mode, context);
 				}
