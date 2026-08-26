@@ -12,7 +12,7 @@ A [pi](https://github.com/earendil-works/pi) extension that registers a single `
 
 ## Dependencies
 
-`safe_bash` ships in this repo (`tools/safe-bash.ts`). `web-access` is provided by the installed `pi-web-access` package. `web_fetch` is resolved next to this extension when installed as a package, with the global extension directory as a fallback.
+`safe_bash` ships in this repo (`tools/safe-bash.ts`). `web-access` is provided by the installed `pi-web-access` package. `web_fetch` is resolved next to this extension when installed as a package, with the global extension directory as a fallback. Agents that request the built-in `bash` tool automatically load the headless `bash-guard` hook in the child process.
 
 ## Usage
 
@@ -148,7 +148,7 @@ const CUSTOM_TOOL_EXTENSIONS: Record<string, string> = {
 };
 ```
 
-Built-in tools (`read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`) work automatically. Any other tool the agent lists in its frontmatter must have a corresponding entry here pointing to the extension's `index.ts`.
+Built-in tools (`read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`) work automatically. Agents that request built-in `bash` also receive the child-mode `bash-guard` hook; if that hook is unavailable, the child launch fails closed. Any other tool the agent lists in its frontmatter must have a corresponding entry here pointing to the extension's `index.ts`.
 
 The `subagent` tool itself is listed in `CUSTOM_TOOL_EXTENSIONS` pointing back to this extension's own `index.ts` — that's how an agent like `worker` can recursively spawn other agents. Recursion is bounded only by each agent's `subagent_agents` allowlist (e.g. worker can spawn scout/researcher, neither of which declares the `subagent` tool, so the chain stops at depth 2).
 
