@@ -78,7 +78,8 @@ function computeBreakdown(ctx: any): ContextBreakdown | null {
 	if (!usage) return null;
 
 	const { contextWindow } = usage;
-	const branch = ctx.sessionManager.getBranch();
+	// Use the same compaction-aware entry projection that Pi sends to the LLM.
+	const branch = ctx.sessionManager.buildContextEntries();
 
 	// Accumulators
 	let systemPromptTokens = 0;
@@ -139,10 +140,11 @@ function computeBreakdown(ctx: any): ContextBreakdown | null {
 						// Thinking tokens are in the output but we estimate content size
 						thinkingTokens += estimateStringTokens(block.thinking);
 					}
-					// ToolCall blocks: their tokens are small (function name + args JSON)
-					if ((block as any).type === "tool_use" || (block as any).toolCallId) {
+					// Tool-call blocks are part of the assistant output and include
+					// argument JSON in the active context.
+					if (block.type === "toolCall") {
 						assistantTextTokens += estimateStringTokens(
-							JSON.stringify((block as any).arguments ?? {})
+							JSON.stringify({ name: block.name, arguments: block.arguments ?? {} })
 						);
 					}
 				}
