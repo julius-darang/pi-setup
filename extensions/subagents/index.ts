@@ -99,6 +99,10 @@ const CONFIG_PATH = path.join(EXT_DIR, "config.json");
 const PI_AGENT_DIR = process.env.PI_CODING_AGENT_DIR || path.join(process.env.HOME || "~", ".pi", "agent");
 const GLOBAL_EXTENSIONS_DIR = path.join(PI_AGENT_DIR, "extensions");
 const PACKAGE_EXTENSIONS_DIR = path.resolve(EXT_DIR, "..");
+const BASH_GUARD_EXTENSION = [
+	path.join(PACKAGE_EXTENSIONS_DIR, "bash-guard", "index.ts"),
+	path.join(GLOBAL_EXTENSIONS_DIR, "bash-guard", "index.ts"),
+].find((candidate) => fs.existsSync(candidate));
 const DEFAULT_MAX_CONCURRENCY = 4;
 
 function loadConfig(): ExtensionConfig {
@@ -323,6 +327,12 @@ async function buildPiArgs(
 	for (const tool of agent.tools) {
 		if (BUILTIN_TOOLS.has(tool)) {
 			allowlist.push(tool);
+			if (tool === "bash") {
+				if (!BASH_GUARD_EXTENSION) {
+					throw new Error("Cannot spawn an agent with built-in bash: bash-guard extension was not found");
+				}
+				extensionPaths.add(BASH_GUARD_EXTENSION);
+			}
 		} else if (CUSTOM_TOOL_EXTENSIONS[tool]) {
 			allowlist.push(tool);
 			extensionPaths.add(CUSTOM_TOOL_EXTENSIONS[tool]);
