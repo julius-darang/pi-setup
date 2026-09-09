@@ -1,38 +1,23 @@
 /**
  * Safe bash extension for worker subagent.
- * Wraps the built-in bash tool with dangerous command blocking.
+ * Wraps the built-in bash tool with the shared shell-aware risk analyzer.
  */
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { createBashTool } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
-
-const DANGEROUS_PATTERNS = [
-	/\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+)?(-[a-zA-Z]*r[a-zA-Z]*\s+)?(\/|~\/?\s|~\/?\b)/,
-	/\brm\s+(-[a-zA-Z]*r[a-zA-Z]*\s+)?(-[a-zA-Z]*f[a-zA-Z]*\s+)?(\/|~\/?\s|~\/?\b)/,
-	/\bsudo\b/,
-	/\bmkfs\b/,
-	/\bdd\s+if=/,
-	/:\(\)\s*\{\s*:\|:&\s*\}\s*;:/,
-	/>\s*\/dev\/[sh]d[a-z]/,
-	/\bchmod\s+(-[a-zA-Z]+\s+)?777\s+\//,
-	/\bchown\s+(-[a-zA-Z]+\s+)?root/,
-	/\bcurl\s.*\|\s*(ba)?sh/,
-	/\bwget\s.*\|\s*(ba)?sh/,
-	/\bshutdown\b/,
-	/\breboot\b/,
-	/\binit\s+0\b/,
-	/\bkill\s+-9\s+1\b/,
-	/\bkillall\b/,
-];
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createBashTool } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+import { analyzeBashCommand } from "../../bash-guard/analyzer.ts";
+import { isWorkerBashBlocked } from "./safe-bash-policy.ts";
 
 function isDangerous(command: string): string | null {
-	const normalized = command.replace(/\\\n/g, " ");
-	for (const pattern of DANGEROUS_PATTERNS) {
-		if (pattern.test(normalized)) {
-			return `Command blocked by safe_bash: matches dangerous pattern ${pattern}`;
-		}
+	const workerBlock = isWorkerBashBlocked(command);
+	if (workerBlock) return workerBlock;
+
+	const risk = analyzeBashCommand(command);
+	if (!risk) return null;
+	if (risk.severity !== "high" && !risk.reasons.some((reason) => reason.startsWith("unparsed shell command"))) {
+		return null;
 	}
-	return null;
+	return `Command blocked by safe_bash: ${risk.reasons.join("; ")}`;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -42,14 +27,14 @@ export default function (pi: ExtensionAPI) {
 		name: "safe_bash",
 		label: "Safe Bash",
 		description:
-			"Execute a bash command. Blocks dangerous commands (rm -rf /, sudo, mkfs, etc.).",
+			"Execute a bash command. Blocks high-risk commands and Git mutations using the shared shell-aware safety policy.",
 		parameters: Type.Object({
 			command: Type.String({ description: "Bash command to execute" }),
 			timeout: Type.Optional(
 				Type.Number({ description: "Timeout in seconds (optional)" }),
 			),
 		}),
-		async execute(toolCallId, params, signal, onUpdate, ctx) {
+		async execute(toolCallId, params, signal, onUpdate) {
 			const danger = isDangerous(params.command);
 			if (danger) {
 				throw new Error(danger);

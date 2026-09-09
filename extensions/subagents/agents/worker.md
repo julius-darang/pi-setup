@@ -3,7 +3,6 @@ name: worker
 description: General-purpose worker — reads, writes, and edits code
 tools: read, write, edit, safe_bash, web-access, web_fetch, subagent
 subagent_agents: scout, researcher
-model: opencode-go/gpt-5.6-luna
 thinking: medium
 ---
 

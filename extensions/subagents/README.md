@@ -4,15 +4,15 @@ A [pi](https://github.com/earendil-works/pi) extension that registers a single `
 
 | Agent | Tools | Model | Purpose |
 |-------|-------|-------|---------|
-| **scout** | read, grep, find, ls | opencode-go/glm-5.2 | Fast codebase recon |
-| **researcher** | web-access, web_fetch | opencode-go/grok-4.5 | Web research |
-| **worker** | read, write, edit, safe_bash, web-access, web_fetch, subagent | opencode-go/gpt-5.6-luna | Code changes (can dispatch scout/researcher to protect its own context) |
+| **scout** | read, grep, find, ls | Pi default (or override) | Fast codebase recon |
+| **researcher** | web-access, web_fetch | Pi default (or override) | Web research |
+| **worker** | read, write, edit, safe_bash, web-access, web_fetch, subagent | Pi default (or override) | Code changes (can dispatch scout/researcher to protect its own context) |
 
 `worker` is allowlisted to spawn only `scout` and `researcher` (via `subagent_agents` in its frontmatter), so the chain stops at depth 2 — a worker cannot recurse into another worker.
 
 ## Dependencies
 
-`safe_bash` ships in this repo (`tools/safe-bash.ts`). `web-access` is provided by the installed `pi-web-access` package. `web_fetch` is resolved next to this extension when installed as a package, with the global extension directory as a fallback. Agents that request the built-in `bash` tool automatically load the headless `bash-guard` hook in the child process.
+`safe_bash` ships in this repo (`tools/safe-bash.ts`), uses the shared shell-aware analyzer from `bash-guard`, and blocks Git mutations in workers. `web-access` is provided by the installed `pi-web-access` package. `web_fetch` is resolved next to this extension when installed as a package, with the global extension directory as a fallback. Agents that request the built-in `bash` tool automatically load the headless `bash-guard` hook in the child process.
 
 ## Usage
 
@@ -59,7 +59,7 @@ Create markdown files with YAML frontmatter in your extension's directory (e.g. 
 name: my-agent
 description: Does a specific thing
 tools: web-access, video_extract
-model: claude-sonnet-4-20250514
+model: anthropic/claude-sonnet-4-6
 ---
 
 You are an agent that does a specific thing...
@@ -69,7 +69,7 @@ Frontmatter fields:
 - **name** (required) — unique agent name, used in `{ agent: "my-agent" }` calls
 - **description** — short description
 - **tools** — comma-separated list of tools the agent needs (builtin or extension). Include `subagent` here to let this agent spawn other agents.
-- **model** — model identifier (defaults to `anthropic/claude-sonnet-4-6`)
+- **model** — optional exact `provider/model` identifier. If omitted, the child inherits the user's configured Pi model. Explicit values are preflighted against Pi's `ModelRegistry` before launch; model IDs may contain additional slashes.
 - **thinking** — reasoning level: `off`, `low`, `medium`, `high` (defaults to `medium`)
 - **subagent_agents** — if `subagent` is in `tools`, restrict which agents this one may spawn. Comma-separated list of agent names. Omit for no restriction. Enforced by passing `PI_SUBAGENT_ALLOWED` env to the child `pi` process — the child's subagents extension filters its registry before any tool description sees it, so the child LLM literally can't reference an agent outside the allowlist.
 
@@ -88,7 +88,7 @@ interface AgentConfig {
   name: string;
   description: string;
   tools: string[];
-  model: string;
+  model?: string;         // omitted means inherit Pi's configured model
   thinking: string;        // "off" | "low" | "medium" | "high"
   systemPrompt: string;
   filePath: string;
@@ -119,7 +119,7 @@ function registerMyAgents(): void {
         name: frontmatter.name,
         description: frontmatter.description || "",
         tools,
-        model: frontmatter.model || "anthropic/claude-sonnet-4-6",
+        model: frontmatter.model || process.env.PI_SUBAGENT_DEFAULT_MODEL,
         thinking: frontmatter.thinking || "medium",
         systemPrompt: body,
         filePath,
@@ -148,9 +148,9 @@ const CUSTOM_TOOL_EXTENSIONS: Record<string, string> = {
 };
 ```
 
-Built-in tools (`read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`) work automatically. Agents that request built-in `bash` also receive the child-mode `bash-guard` hook; if that hook is unavailable, the child launch fails closed. Any other tool the agent lists in its frontmatter must have a corresponding entry here pointing to the extension's `index.ts`.
+Built-in tools (`read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`) work automatically; built-in `bash` also loads the headless `bash-guard` hook. Any other tool the agent lists in its frontmatter must have a corresponding entry here pointing to the extension's `index.ts`.
 
-The `subagent` tool itself is listed in `CUSTOM_TOOL_EXTENSIONS` pointing back to this extension's own `index.ts` — that's how an agent like `worker` can recursively spawn other agents. Recursion is bounded only by each agent's `subagent_agents` allowlist (e.g. worker can spawn scout/researcher, neither of which declares the `subagent` tool, so the chain stops at depth 2).
+The `subagent` tool itself is listed in `CUSTOM_TOOL_EXTENSIONS` pointing back to this extension's own `index.ts` — that's how an agent like `worker` can recursively spawn other agents. The built-in recursion path is bounded by each agent's `subagent_agents` allowlist (worker can spawn scout/researcher, neither of which declares the `subagent` tool, so the chain stops at depth 2). The child depth is also propagated as `PI_SUBAGENT_DEPTH` for integrations that need to enforce their own limit.
 
 ## Structure
 

@@ -20,9 +20,9 @@ import type {
 	ExtensionCommandContext,
 	ContextUsage,
 	Theme,
-} from "@mariozechner/pi-coding-agent";
-import type { AssistantMessage, ToolResultMessage, UserMessage } from "@mariozechner/pi-ai";
-import { matchesKey, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import type { AssistantMessage, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
+import { matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 // ── Category definitions ──────────────────────────────────────────────
 
@@ -78,8 +78,7 @@ function computeBreakdown(ctx: any): ContextBreakdown | null {
 	if (!usage) return null;
 
 	const { contextWindow } = usage;
-	// Use the same compaction-aware entry projection that Pi sends to the LLM.
-	const branch = ctx.sessionManager.buildContextEntries();
+	const branch = ctx.sessionManager.getBranch();
 
 	// Accumulators
 	let systemPromptTokens = 0;
@@ -140,11 +139,10 @@ function computeBreakdown(ctx: any): ContextBreakdown | null {
 						// Thinking tokens are in the output but we estimate content size
 						thinkingTokens += estimateStringTokens(block.thinking);
 					}
-					// Tool-call blocks are part of the assistant output and include
-					// argument JSON in the active context.
-					if (block.type === "toolCall") {
+					// ToolCall blocks: their tokens are small (function name + args JSON)
+					if ((block as any).type === "tool_use" || (block as any).toolCallId) {
 						assistantTextTokens += estimateStringTokens(
-							JSON.stringify({ name: block.name, arguments: block.arguments ?? {} })
+							JSON.stringify((block as any).arguments ?? {})
 						);
 					}
 				}
@@ -527,7 +525,6 @@ export default function (pi: ExtensionAPI) {
 					overlayOptions: {
 						anchor: "center",
 						width: "80%",
-						maxWidth: 100,
 						minWidth: 40,
 						maxHeight: "90%",
 					},
