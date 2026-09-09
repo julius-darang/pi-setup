@@ -17,8 +17,10 @@ which pi-subagents injects into every spawned process.
   `fdisk`, `gdisk/sgdisk`, `cryptsetup`, `pvcreate/vgcreate/lvcreate`, `zpool`, `lsblk`
 - Prompts for: `rm`/`rmdir`/`unlink`, `sudo`, `find -delete`, `dd`, `truncate`, `sed -i`,
   `perl -pi`, `chmod/chown -R`, `mv/cp --force`, `kill`/`pkill`/`killall`, `shutdown`/`reboot`,
-  `systemctl stop/disable`, `curl|sh`/`wget|sh`, `kubectl delete`, `terraform destroy`,
-  `aws s3 rm --recursive`, `gcloud delete`, shell redirections (`>`, `>>`, `2>`), pipes
+  `systemctl stop/disable`, `curl|sh`/`wget|sh`, inline interpreter code (`python -c`, `node -e`),
+  opaque make targets (`clean`, `deploy`, `destroy`, `install`, `publish`, `release`, `reset`,
+  `uninstall`), `kubectl delete`, `terraform destroy`, `aws s3 rm --recursive`, `gcloud delete`,
+  shell redirections (`>`, `>>`, `2>`), pipes
 - Shows a 2-option dialog: **Run** / **Abort**
 - If aborted, the tool call is blocked and the model receives a clear reason
 - Remembers recently aborted commands for 60 s to prevent retry loops
@@ -51,8 +53,10 @@ a focused set of catastrophic/unrecoverable operations is hard-blocked with no u
 | `git clean -f` | Delete untracked files |
 | `git reflog expire` | Remove recovery history |
 | `git gc --prune` | Prune unreachable objects |
+| Inline interpreter code (`python -c`, `node -e`, `ruby -e`, etc.) | Opaque command execution |
+| Opaque make targets (`clean`, `deploy`, `destroy`, `install`, `publish`, `release`, `reset`, `uninstall`) | May hide deletion, deployment, or environment changes |
 
-All other commands (including routine git operations) pass through unaffected.
+All other commands (including routine git operations, `python -m unittest`, and `make test`) pass through unaffected.
 
 ## Install
 
@@ -60,6 +64,7 @@ Auto-discovered from `~/.pi/agent/extensions/bash-guard/`. Run `/reload` in pi.
 
 ## Notes
 
+- `analyzer.ts` contains the shared shell-aware risk analyzer used by this extension and the worker's `safe_bash` tool. Interactive mode prompts on medium/high findings; headless and `safe_bash` modes block high-severity (and unparseable) findings, while headless mode also retains its focused catastrophic-operation policy.
 - Scope: `bash` tool calls only (`write`/`edit` and user `!` commands are not intercepted).
 - `--bash-guard-auto-allow`: main-session flag that allows flagged commands when there is no UI
   (e.g. running pi non-interactively). Has no effect in subagent sessions.

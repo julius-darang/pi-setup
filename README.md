@@ -34,8 +34,8 @@ The `researcher` subagent also uses the separately installed `pi-web-access` pac
 
 ## Requirements
 
-- Pi Coding Agent 0.84 or newer
-- Node.js and npm
+- Pi Coding Agent 0.84.4 (the package currently targets the 0.84.x API)
+- Node.js 22.19 or newer and npm
 - Python 3 for the optional `send-email` helper
 - A configured Pi provider or subscription
 - Optional: `pi-web-access` for the researcher agent
@@ -63,12 +63,12 @@ pi install git:github.com/julius-darang/pi-setup@v0.1.0
 Then install the web-access dependency:
 
 ```bash
-pi install npm:pi-web-access
+pi install npm:pi-web-access@0.27.0
 ```
 
 ### Option B: Clone and run the installer
 
-This installs the extensions and skills from the checked-out Git `HEAD` into the global Pi directory (`~/.pi/agent/` by default), installs their npm dependencies without lifecycle scripts, and installs `pi-web-access` if it is missing. Only tracked repository files are installed; uncommitted changes and ignored local files such as credentials, recipient lists, and `node_modules` are excluded.
+This registers the checkout as a local Pi package, installs its locked npm dependencies without lifecycle scripts, runs the full `npm run validate` gate before registration, and registers the pinned `pi-web-access` package. Existing manually copied extensions and skills are not removed.
 
 ```bash
 git clone https://github.com/julius-darang/pi-setup.git
@@ -82,7 +82,33 @@ Use another Pi directory when needed:
 PI_CODING_AGENT_DIR="$HOME/.config/pi/agent" ./install.sh
 ```
 
+If the global directory already contains manually copied copies of this package's resources, review the migration plan before restarting Pi:
+
+```bash
+npm run migration:report
+node scripts/migrate-global-resources.mjs --apply
+```
+
+The migration moves only the overlapping extension and skill paths into a dated backup; it leaves unrelated resources such as `stop-slop` in place. It restores the private email `.env` and recipient files to the stable config path (with mode `600`) so moving the duplicate skill code does not disable email. Use the dry-run output and keep the backup until the package has loaded successfully.
+
 Restart Pi or run `/reload` after installation.
+
+### Session retention
+
+Pi sessions remain local and may contain sensitive prompts and tool output. Review old JSONL sessions with the dry-run report before removing anything:
+
+```bash
+npm run sessions:report
+node scripts/retain-sessions.mjs --days 30
+```
+
+Only delete after reviewing the report and confirming you have any backup you need:
+
+```bash
+node scripts/retain-sessions.mjs --days 30 --apply
+```
+
+The command uses `PI_CODING_AGENT_DIR` when set, keeps the default retention window at 30 days, and never deletes by default.
 
 ## Configuration
 
@@ -96,12 +122,14 @@ Do not copy credentials into the repository. Pi authentication belongs in Pi's n
 
 ### Subagent models
 
-The bundled agent definitions contain example model IDs. Override them without editing the files:
+The bundled agent definitions inherit Pi's configured model by default. Override individual agents without editing the files. Explicit overrides must be exact `provider/model` identifiers registered in Pi's model registry; invalid overrides are rejected before a child process starts. Model IDs containing additional slashes are supported:
 
 ```bash
 export PI_SUBAGENT_MODEL_SCOUT='your-provider/your-model'
 export PI_SUBAGENT_MODEL_RESEARCHER='your-provider/your-model'
 export PI_SUBAGENT_MODEL_WORKER='your-provider/your-model'
+# Optional fallback for agents whose frontmatter omits `model`:
+export PI_SUBAGENT_DEFAULT_MODEL='your-provider/your-model'
 ```
 
 The environment variable names are derived from the agent names. The override is useful when a provider does not offer the example models.
@@ -111,9 +139,11 @@ The environment variable names are derived from the agent names. The override is
 The email skill is disabled in practice until you configure it locally. Never commit the real credentials or recipient list.
 
 ```bash
-cp skills/send-email/.env.example ~/.pi/agent/skills/send-email/.env
-cp skills/send-email/recipients.example.txt ~/.pi/agent/skills/send-email/recipients.txt
-chmod 600 ~/.pi/agent/skills/send-email/.env
+PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+mkdir -p "$PI_DIR/skills/send-email"
+cp skills/send-email/.env.example "$PI_DIR/skills/send-email/.env"
+cp skills/send-email/recipients.example.txt "$PI_DIR/skills/send-email/recipients.txt"
+chmod 600 "$PI_DIR/skills/send-email/.env" "$PI_DIR/skills/send-email/recipients.txt"
 ```
 
 Edit those files locally. The SMTP password must be a Google App Password, not a normal Google password. The skill always requires an exact preview and explicit confirmation before sending.
@@ -128,7 +158,7 @@ Pi runtime
   └── optional packages      ── pi-web-access and other capabilities
 ```
 
-The `subagents` extension starts isolated Pi processes:
+The `subagents` extension starts isolated Pi processes. Agents inherit the user's configured Pi model unless a `PI_SUBAGENT_MODEL_*` or `PI_SUBAGENT_DEFAULT_MODEL` override is set:
 
 ```text
 parent session
@@ -142,7 +172,7 @@ Child processes do not inherit the parent's conversation or session. The parent 
 
 ## Safety model
 
-`bash-guard` inspects Bash commands issued by the agent. The main interactive session asks whether to run or abort commands classified as risky. Spawned child sessions receive an explicit `PI_SUBAGENT_DEPTH` and use headless blocking for catastrophic patterns.
+`bash-guard` inspects Bash commands issued by the agent. The main interactive session asks whether to run or abort commands classified as risky. Spawned child sessions receive an explicit `PI_SUBAGENT_DEPTH` and use headless blocking for catastrophic patterns. Worker `safe_bash` also blocks Git mutations; workers may inspect Git state but commits, pushes, pulls, and other repository mutations belong in the parent session.
 
 The safety layer is not a sandbox and is not a complete security boundary:
 
@@ -177,14 +207,14 @@ For a package installation:
 pi update --extensions
 ```
 
-For a clone-based installation, pull the repository and rerun:
+For a checkout-based installation, pull the repository and rerun:
 
 ```bash
 git pull
 ./install.sh
 ```
 
-Remove individual resources from `~/.pi/agent/extensions/` or `~/.pi/agent/skills/`, then restart Pi. Keep a backup before removing resources shared with another setup.
+Remove the package through Pi's package manager when it is no longer needed. Do not remove manually copied resources until you have confirmed they are duplicates; keep a backup before any cleanup.
 
 ## Public-repository policy
 

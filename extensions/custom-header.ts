@@ -8,9 +8,9 @@
  * To restore the built-in header: rename/delete this file and /reload.
  */
 
-import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
-import { VERSION, keyHint, rawKeyHint } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import { VERSION, keyHint, rawKeyHint } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 
 /**
  * Build the header text. This is what you customize.
@@ -53,7 +53,7 @@ function buildHeader(theme: Theme): string {
 		rawKeyHint("ctrl+c twice", "to exit"),
 		rawKeyHint("ctrl+d", "to exit (empty)"),
 		rawKeyHint("ctrl+z", "to suspend"),
-		keyHint("deleteToLineEnd", "to delete to end"),
+		keyHint("tui.editor.deleteToLineEnd", "to delete to end"),
 		rawKeyHint("shift+tab", "to cycle thinking level"),
 		rawKeyHint("ctrl+p/shift+ctrl+p", "to cycle models"),
 		rawKeyHint("ctrl+l", "to select model"),
