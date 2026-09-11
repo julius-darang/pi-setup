@@ -1,13 +1,13 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import {
 	DynamicBorder,
 	getMarkdownTheme,
 	isEditToolResult,
 	isToolCallEventType,
 	isWriteToolResult,
-} from "@mariozechner/pi-coding-agent";
-import type { SelectItem } from "@mariozechner/pi-tui";
-import { Container, Key, Markdown, SelectList, Text, matchesKey } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import type { SelectItem } from "@earendil-works/pi-tui";
+import { Container, Key, Markdown, SelectList, Text, matchesKey } from "@earendil-works/pi-tui";
 import { createTwoFilesPatch } from "diff";
 import { readFile, writeFile, rm, mkdir } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
@@ -276,7 +276,7 @@ export default function (pi: ExtensionAPI) {
 		if (ctx.hasUI && !force) {
 			const ok = await ctx.ui.confirm(
 				"Decline pi changes?",
-				"This will revert logged pi changes (overwrite files / delete created files). Files changed outside pi are left untouched."
+				"This will revert logged pi changes. Files changed outside pi since they were logged are left untouched."
 			);
 			if (!ok) return;
 		} else if (!ctx.hasUI && !force) {
@@ -294,8 +294,8 @@ export default function (pi: ExtensionAPI) {
 				continue;
 			}
 
-			// If the file is already back at its original state, it is safe to
-			// retire the entry without touching the filesystem.
+			// If the file is already back at its original state, retire the entry
+			// without touching the filesystem.
 			if (state.content === item.originalContent) {
 				baselines.delete(item.path);
 				tracked.delete(item.path);
@@ -305,7 +305,7 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			// Only undo the exact state last observed after a successful pi tool
-			// call. This prevents a decline from overwriting external edits.
+			// call. This prevents decline from overwriting external edits.
 			if (state.content !== item.currentContent) {
 				issues.push(`${item.displayPath}: changed outside pi since it was logged; left untouched`);
 				continue;
@@ -360,7 +360,7 @@ export default function (pi: ExtensionAPI) {
 
 		const count = tracked.size;
 		await clearLog(ctx, "accept");
-		if (ctx.hasUI) ctx.ui.notify(`filechanges: accepted changes for ${count} file(s).`, "success");
+		if (ctx.hasUI) ctx.ui.notify(`filechanges: accepted changes for ${count} file(s).`, "info");
 	}
 
 	function parseCommandArgs(args: string | undefined): string[] {
@@ -557,15 +557,7 @@ export default function (pi: ExtensionAPI) {
 		await rebuildFromSession(ctx);
 	});
 
-	pi.on("session_switch", async (_event, ctx) => {
-		await rebuildFromSession(ctx);
-	});
-
 	pi.on("session_tree", async (_event, ctx) => {
-		await rebuildFromSession(ctx);
-	});
-
-	pi.on("session_fork", async (_event, ctx) => {
 		await rebuildFromSession(ctx);
 	});
 

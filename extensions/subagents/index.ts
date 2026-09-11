@@ -8,10 +8,11 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme, parseFrontmatter, truncateHead, withFileMutationQueue, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@mariozechner/pi-coding-agent";
-import { Container, Markdown, Spacer, Text, visibleWidth } from "@mariozechner/pi-tui";
-import { Type } from "@sinclair/typebox";
+import { fileURLToPath } from "node:url";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { getMarkdownTheme, parseFrontmatter, truncateHead, withFileMutationQueue, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
+import { Container, Markdown, Spacer, Text, visibleWidth } from "@earendil-works/pi-tui";
+import { Type } from "typebox";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -19,7 +20,7 @@ export interface AgentConfig {
 	name: string;
 	description: string;
 	tools: string[];
-	model: string;
+	model?: string;
 	thinking: string;
 	systemPrompt: string;
 	filePath: string;
@@ -92,17 +93,53 @@ interface ExtensionConfig {
 	maxConcurrency?: number;
 }
 
-const EXT_DIR = path.dirname(new URL(import.meta.url).pathname);
+export interface ModelRegistryLookup {
+	find(provider: string, modelId: string): { contextWindow?: number } | undefined;
+}
+
+/**
+ * Resolve an explicitly configured subagent model before starting a child.
+ * Pi accepts provider/model references, but a child launched with an unknown
+ * reference otherwise fails only after the process has been spawned. Keep this
+ * check synchronous and registry-backed so credentials and network access are
+ * never needed for preflight.
+ */
+export function resolveAgentModel(
+	modelReference: string | undefined,
+	registry: ModelRegistryLookup,
+): { provider: string; modelId: string; contextWindow?: number } | undefined {
+	if (!modelReference) return undefined;
+
+	const separator = modelReference.indexOf("/");
+	if (separator <= 0 || separator === modelReference.length - 1) {
+		throw new Error(
+			`Invalid subagent model "${modelReference}". Use an exact provider/model identifier or omit model to inherit Pi's current model.`,
+		);
+	}
+
+	const provider = modelReference.slice(0, separator);
+	const modelId = modelReference.slice(separator + 1);
+	const model = registry.find(provider, modelId);
+	if (!model) {
+		throw new Error(
+			`Subagent model "${modelReference}" was not found in Pi's model registry. Use an exact provider/model identifier or omit model to inherit Pi's current model.`,
+		);
+	}
+
+	return { provider, modelId, contextWindow: model.contextWindow };
+}
+
+const EXT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const AGENTS_DIR = path.join(EXT_DIR, "agents");
 const TOOLS_DIR = path.join(EXT_DIR, "tools");
 const CONFIG_PATH = path.join(EXT_DIR, "config.json");
 const PI_AGENT_DIR = process.env.PI_CODING_AGENT_DIR || path.join(process.env.HOME || "~", ".pi", "agent");
 const GLOBAL_EXTENSIONS_DIR = path.join(PI_AGENT_DIR, "extensions");
 const PACKAGE_EXTENSIONS_DIR = path.resolve(EXT_DIR, "..");
-const BASH_GUARD_EXTENSION = [
+const BASH_GUARD_EXTENSION_CANDIDATES = [
 	path.join(PACKAGE_EXTENSIONS_DIR, "bash-guard", "index.ts"),
 	path.join(GLOBAL_EXTENSIONS_DIR, "bash-guard", "index.ts"),
-].find((candidate) => fs.existsSync(candidate));
+];
 const DEFAULT_MAX_CONCURRENCY = 4;
 
 function loadConfig(): ExtensionConfig {
@@ -196,7 +233,10 @@ function loadAgents(): AgentConfig[] {
 			name: frontmatter.name,
 			description: frontmatter.description || "",
 			tools,
-			model: process.env[modelEnvKey] || frontmatter.model || "anthropic/claude-sonnet-4-6",
+			// An omitted model intentionally inherits the user's configured Pi model.
+			// Role-specific overrides remain available through PI_SUBAGENT_MODEL_*.
+			model: process.env[modelEnvKey] || frontmatter.model || process.env.PI_SUBAGENT_DEFAULT_MODEL,
+
 			thinking: frontmatter.thinking || "medium",
 			systemPrompt: body,
 			filePath,
@@ -303,7 +343,7 @@ function truncLine(text: string, maxWidth: number): string {
 
 // ── Subagent Execution ────────────────────────────────────────────────
 
-async function buildPiArgs(
+export async function buildPiArgs(
 	agent: AgentConfig,
 	task: string,
 	cwd: string,
@@ -317,7 +357,15 @@ async function buildPiArgs(
 		await fs.promises.writeFile(promptPath, agent.systemPrompt, { encoding: "utf-8", mode: 0o600 });
 	});
 
-	const args = [...piBin.baseArgs, "--mode", "json", "-p", "--no-session", "--no-skills"];
+	const args = [
+		...piBin.baseArgs,
+		"--mode",
+		"json",
+		"-p",
+		"--no-session",
+		"--no-skills",
+		"--no-prompt-templates",
+	];
 
 	// Separate builtin tools from custom tools. Both kinds share the same
 	// --tools allowlist in pi; --no-tools would disable extension tools too.
@@ -328,10 +376,11 @@ async function buildPiArgs(
 		if (BUILTIN_TOOLS.has(tool)) {
 			allowlist.push(tool);
 			if (tool === "bash") {
-				if (!BASH_GUARD_EXTENSION) {
+				const bashGuard = BASH_GUARD_EXTENSION_CANDIDATES.find((candidate) => fs.existsSync(candidate));
+				if (!bashGuard) {
 					throw new Error("Cannot spawn an agent with built-in bash: bash-guard extension was not found");
 				}
-				extensionPaths.add(BASH_GUARD_EXTENSION);
+				extensionPaths.add(bashGuard);
 			}
 		} else if (CUSTOM_TOOL_EXTENSIONS[tool]) {
 			allowlist.push(tool);
@@ -354,7 +403,7 @@ async function buildPiArgs(
 		args.push("--extension", extPath);
 	}
 
-	args.push("--model", agent.model);
+	if (agent.model) args.push("--model", agent.model);
 	args.push("--thinking", agent.thinking);
 	args.push("--append-system-prompt", promptPath);
 
@@ -431,7 +480,7 @@ function extractToolArgsPreview(args: Record<string, unknown>): string {
 	return cap(flatten(JSON.stringify(args)));
 }
 
-async function runSubagent(
+export async function runSubagent(
 	agent: AgentConfig,
 	task: string,
 	cwd: string,
@@ -596,21 +645,32 @@ async function runSubagent(
 			stderrBuf += d.toString();
 		});
 
+		let settled = false;
+		const kill = () => {
+			if (settled) return;
+			proc.kill("SIGTERM");
+			setTimeout(() => !settled && proc.kill("SIGKILL"), 3000);
+		};
+		const removeAbortListener = () => signal?.removeEventListener("abort", kill);
+
 		proc.on("close", (code) => {
 			if (buf.trim()) processLine(buf);
-			if (code !== 0 && stderrBuf.trim() && !progress.error) {
-				progress.error = stderrBuf.trim();
+			if (code !== 0 && !progress.error) {
+				progress.error = stderrBuf.trim() || `Pi child exited with code ${code ?? 1}`;
 			}
+			settled = true;
+			removeAbortListener();
 			resolve(code ?? 1);
 		});
 
-		proc.on("error", () => resolve(1));
+		proc.on("error", (error) => {
+			if (!progress.error) progress.error = error.message;
+			settled = true;
+			removeAbortListener();
+			resolve(1);
+		});
 
 		if (signal) {
-			const kill = () => {
-				proc.kill("SIGTERM");
-				setTimeout(() => !proc.killed && proc.kill("SIGKILL"), 3000);
-			};
 			if (signal.aborted) kill();
 			else signal.addEventListener("abort", kill, { once: true });
 		}
@@ -870,14 +930,15 @@ export default function (pi: ExtensionAPI) {
 				throw new Error(`Unknown agent: ${params.agent}. Available agents: ${available}`);
 			}
 
-			const [provider, modelId] = (agent.model || "").split("/");
-			const contextWindow = provider && modelId ? ctx.modelRegistry.find(provider, modelId)?.contextWindow : undefined;
+			const resolvedModel = resolveAgentModel(agent.model, ctx.modelRegistry);
+			const inheritedModel = agent.model ? undefined : ctx.model;
+			const contextWindow = resolvedModel?.contextWindow ?? inheritedModel?.contextWindow;
 			const liveResult: AgentResult = {
 				agent: params.agent,
 				task: params.task,
 				output: "",
 				exitCode: -1,
-				model: agent.model,
+				model: agent.model ?? (inheritedModel ? `${inheritedModel.provider}/${inheritedModel.id}` : undefined),
 				contextWindow,
 				usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, turns: 0 },
 				progress: { agent: params.agent, status: "running" as const, task: params.task, recentTools: [], toolCount: 0, tokens: 0, durationMs: 0, lastMessage: "" },

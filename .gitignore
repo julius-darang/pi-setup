@@ -1,7 +1,8 @@
 # Installed dependencies and generated files
-node_modules/
+node_modules
 __pycache__/
 *.pyc
+*.tgz
 
 # Local Pi credentials and state
 .env

@@ -2,7 +2,6 @@
 name: researcher
 description: Web researcher — searches the web and synthesizes findings
 tools: web-access, web_fetch
-model: opencode-go/grok-4.5
 thinking: medium
 ---
 

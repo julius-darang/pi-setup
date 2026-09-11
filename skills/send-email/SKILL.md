@@ -42,11 +42,13 @@ SMTP_FROM="Julius <your-gmail-address@gmail.com>"
 
 Google requires 2-Step Verification before an App Password can be created. Store the App Password in the local `.env` file only; never request it in chat or print it.
 
-For Gmail SMTP, use STARTTLS on port 587. The bundled helper uses only Python's standard library:
+For Gmail SMTP, use STARTTLS on port 587. The bundled helper uses only Python's standard library and lives next to this skill:
 
 ```text
-~/.pi/agent/skills/send-email/scripts/send_gmail_smtp.py
+scripts/send_gmail_smtp.py
 ```
+
+Resolve that relative path against this skill's directory before invoking it; do not assume the skill was copied into `~/.pi/agent/skills/`.
 
 ## Workflow
 
@@ -90,7 +92,7 @@ If the user asks only to draft, compose, or preview an email, do not send anythi
 After confirmation, validate the required variables without displaying their values, then invoke the helper:
 
 ```bash
-python3 "$HOME/.pi/agent/skills/send-email/scripts/send_gmail_smtp.py" \
+python3 scripts/send_gmail_smtp.py \
   --subject 'Subject line' \
   --text 'Plain-text body'
 ```
@@ -98,7 +100,7 @@ python3 "$HOME/.pi/agent/skills/send-email/scripts/send_gmail_smtp.py" \
 Repeat `--to` for multiple recipients when overriding the defaults. If `--to` is omitted, the helper loads recipients from `recipients.txt`. Use `--html` instead of `--text` only when HTML was explicitly requested. Add one or more files with repeated `--attach` options:
 
 ```bash
-python3 "$HOME/.pi/agent/skills/send-email/scripts/send_gmail_smtp.py" \
+python3 scripts/send_gmail_smtp.py \
   --to 'recipient@example.com' \
   --subject 'Report' \
   --text 'The report is attached.' \

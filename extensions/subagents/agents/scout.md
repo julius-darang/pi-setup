@@ -2,7 +2,6 @@
 name: scout
 description: Fast codebase recon — explores files, finds patterns, maps architecture
 tools: read, grep, find, ls
-model: opencode-go/glm-5.2
 thinking: medium
 ---
 

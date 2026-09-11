@@ -15,7 +15,8 @@ from email.message import EmailMessage
 from email.utils import make_msgid, parseaddr
 from pathlib import Path
 
-ENV_PATH = Path.home() / ".pi" / "agent" / "skills" / "send-email" / ".env"
+AGENT_DIR = Path(os.environ.get("PI_CODING_AGENT_DIR", str(Path.home() / ".pi" / "agent"))).expanduser()
+ENV_PATH = AGENT_DIR / "skills" / "send-email" / ".env"
 RECIPIENTS_PATH = ENV_PATH.parent / "recipients.txt"
 
 

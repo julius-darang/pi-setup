@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
 	Editor,
 	type EditorTheme,
@@ -7,7 +7,7 @@ import {
 	matchesKey,
 	truncateToWidth,
 	wrapTextWithAnsi,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 interface AskOption {
@@ -201,7 +201,7 @@ function buildResult(question: string, context: string | undefined, mode: AskUse
 }
 
 async function askSingleChoice(
-	ctx: any,
+	ctx: Pick<ExtensionContext, "ui">,
 	question: string,
 	context: string | undefined,
 	options: AskOption[],
@@ -328,7 +328,7 @@ async function askSingleChoice(
 }
 
 async function askMultiChoice(
-	ctx: any,
+	ctx: Pick<ExtensionContext, "ui">,
 	question: string,
 	context: string | undefined,
 	options: AskOption[],
@@ -538,7 +538,7 @@ function rpcOptionLabel(option: AskOption, index: number): string {
 }
 
 async function askSingleChoiceRpc(
-	ctx: any,
+	ctx: Pick<ExtensionContext, "ui">,
 	question: string,
 	context: string | undefined,
 	options: AskOption[],
@@ -572,7 +572,7 @@ async function askSingleChoiceRpc(
 }
 
 async function askMultiChoiceRpc(
-	ctx: any,
+	ctx: Pick<ExtensionContext, "ui">,
 	question: string,
 	context: string | undefined,
 	options: AskOption[],

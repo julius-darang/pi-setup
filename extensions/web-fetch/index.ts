@@ -1,20 +1,17 @@
-import { lookup as dnsLookup } from "node:dns/promises";
-import { isIP } from "node:net";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { Text } from "@mariozechner/pi-tui";
+import { Text } from "@earendil-works/pi-tui";
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
+import { assertPublicHttpUrl } from "./url-policy.ts";
 
 const USER_AGENT =
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 const DEFAULT_TIMEOUT_MS = 30000;
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
 const MAX_PDF_SIZE = 20 * 1024 * 1024;
-const MAX_OUTPUT_CHARS = 50_000;
-const MAX_OUTPUT_BYTES = 200_000;
-const MAX_REDIRECTS = 5;
 const MIN_USEFUL_CONTENT = 500;
 const JINA_READER_BASE = "https://r.jina.ai/";
 const JINA_TIMEOUT_MS = 30000;
@@ -31,185 +28,17 @@ interface FetchResult {
 	title: string;
 	content: string;
 	error: string | null;
-	truncated?: boolean;
-	originalChars?: number;
 }
 
-class ResponseTooLargeError extends Error {
-	constructor(maxBytes: number) {
-		super(`Response too large (limit ${Math.round(maxBytes / 1024 / 1024)}MB)`);
-		this.name = "ResponseTooLargeError";
-	}
-}
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
-function parseIPv4(address: string): number[] | null {
-	const octets = address.split(".");
-	if (octets.length !== 4) return null;
-	const values = octets.map((octet) => {
-		if (!/^\d{1,3}$/.test(octet)) return -1;
-		return Number(octet);
-	});
-	return values.every((value) => value >= 0 && value <= 255) ? values : null;
-}
-
-function isNonPublicIPv4(address: string): boolean {
-	const octets = parseIPv4(address);
-	if (!octets) return true;
-	const [a, b, c] = octets;
-
-	return (
-		a === 0 ||
-		a === 10 ||
-		a === 127 ||
-		(a === 100 && b >= 64 && b <= 127) || // shared address space
-		(a === 169 && b === 254) || // link-local
-		(a === 172 && b >= 16 && b <= 31) ||
-		(a === 192 && b === 0) || // IETF protocol assignments
-		(a === 192 && b === 2) || // TEST-NET-1
-		(a === 192 && b === 88 && c === 99) || // 6to4 relay anycast
-		(a === 192 && b === 168) ||
-		(a === 198 && b >= 18 && b <= 19) || // benchmarking
-		(a === 198 && b === 51 && c === 100) || // TEST-NET-2
-		(a === 203 && b === 0 && c === 113) || // TEST-NET-3
-		a >= 224 // multicast and reserved
-	);
-}
-
-function parseIPv6(address: string): number[] | null {
-	let normalized = address.toLowerCase();
-
-	// Zone identifiers are not valid for public HTTP URLs. Fail closed if one
-	// reaches this helper through a resolver or future call site.
-	if (normalized.includes("%")) return null;
-
-	if (normalized.includes(".")) {
-		const separator = normalized.lastIndexOf(":");
-		if (separator < 0) return null;
-		const ipv4 = parseIPv4(normalized.slice(separator + 1));
-		if (!ipv4) return null;
-		const [a, b, c, d] = ipv4;
-		normalized = `${normalized.slice(0, separator)}:${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
-	}
-
-	const compressionIndex = normalized.indexOf("::");
-	if (compressionIndex >= 0) {
-		if (normalized.indexOf("::", compressionIndex + 2) >= 0) return null;
-		const leftText = normalized.slice(0, compressionIndex);
-		const rightText = normalized.slice(compressionIndex + 2);
-		const left = leftText ? leftText.split(":") : [];
-		const right = rightText ? rightText.split(":") : [];
-		const parsePart = (part: string): number | null =>
-			/^[0-9a-f]{1,4}$/.test(part) ? parseInt(part, 16) : null;
-		const leftValues = left.map(parsePart);
-		const rightValues = right.map(parsePart);
-		const zeroCount = 8 - left.length - right.length;
-		if (zeroCount < 1 || leftValues.some((value) => value === null) || rightValues.some((value) => value === null)) {
-			return null;
-		}
-		return [
-			...leftValues as number[],
-			...Array.from({ length: zeroCount }, () => 0),
-			...rightValues as number[],
-		];
-	}
-
-	const parts = normalized.split(":");
-	if (parts.length !== 8) return null;
-	const values = parts.map((part) => /^[0-9a-f]{1,4}$/.test(part) ? parseInt(part, 16) : null);
-	return values.every((value) => value !== null) ? values as number[] : null;
-}
-
-function matchesIPv6Prefix(words: number[], network: number[], prefixLength: number): boolean {
-	let remaining = prefixLength;
-	for (let i = 0; remaining > 0; i++) {
-		const bits = Math.min(16, remaining);
-		const mask = bits === 16 ? 0xffff : (0xffff << (16 - bits)) & 0xffff;
-		if ((words[i] & mask) !== ((network[i] ?? 0) & mask)) return false;
-		remaining -= bits;
-	}
-	return true;
-}
-
-function isNonPublicIPv6(address: string): boolean {
-	const words = parseIPv6(address);
-	if (!words) return true;
-
-	const firstFiveZero = words.slice(0, 5).every((word) => word === 0);
-	if (firstFiveZero && words[5] === 0xffff) {
-		const ipv4 = `${words[6] >> 8}.${words[6] & 0xff}.${words[7] >> 8}.${words[7] & 0xff}`;
-		return isNonPublicIPv4(ipv4);
-	}
-
-	// Deprecated IPv4-compatible IPv6 addresses are treated according to the
-	// embedded IPv4 address rather than being allowed to bypass the policy.
-	if (words.slice(0, 6).every((word) => word === 0)) {
-		const ipv4 = `${words[6] >> 8}.${words[6] & 0xff}.${words[7] >> 8}.${words[7] & 0xff}`;
-		return isNonPublicIPv4(ipv4);
-	}
-
-	return (
-		words.every((word) => word === 0) ||
-		(words.slice(0, 7).every((word) => word === 0) && words[7] === 1) ||
-		matchesIPv6Prefix(words, [0x0064, 0xff9b], 96) || // NAT64 well-known prefix
-		matchesIPv6Prefix(words, [0x0100], 64) || // discard-only prefix
-		matchesIPv6Prefix(words, [0x2001], 32) || // protocol assignments / Teredo
-		matchesIPv6Prefix(words, [0x2001, 0x0001], 32) ||
-		matchesIPv6Prefix(words, [0x2001, 0x0002], 48) || // benchmarking
-		matchesIPv6Prefix(words, [0x2001, 0x0010], 28) || // ORCHID
-		matchesIPv6Prefix(words, [0x2001, 0x0020], 28) || // ORCHIDv2
-		matchesIPv6Prefix(words, [0x2001, 0x0db8], 32) || // documentation
-		matchesIPv6Prefix(words, [0x3ffe], 16) || // 6bone
-		matchesIPv6Prefix(words, [0x2002], 16) || // 6to4
-		matchesIPv6Prefix(words, [0xfc00], 7) || // unique-local
-		matchesIPv6Prefix(words, [0xfe80], 10) || // link-local
-		matchesIPv6Prefix(words, [0xfec0], 10) || // deprecated site-local
-		matchesIPv6Prefix(words, [0xff00], 8) // multicast
-	);
-}
-
-function isNonPublicAddress(address: string): boolean {
-	const normalized = address.replace(/^\[|\]$/g, "");
-	const family = isIP(normalized);
-	if (family === 4) return isNonPublicIPv4(normalized);
-	if (family === 6) return isNonPublicIPv6(normalized);
-	return true;
-}
-
-async function assertPublicUrl(rawUrl: string): Promise<URL> {
-	let url: URL;
+async function discardResponseBody(response: Response): Promise<void> {
 	try {
-		url = new URL(rawUrl);
+		await response.body?.cancel();
 	} catch {
-		throw new Error("Invalid URL");
+		// Redirect responses are being discarded; cancellation failure is harmless.
 	}
-
-	if (url.protocol !== "http:" && url.protocol !== "https:") {
-		throw new Error("Blocked URL: only http and https URLs are supported");
-	}
-	if (url.username || url.password) {
-		throw new Error("Blocked URL: embedded credentials are not allowed");
-	}
-
-	const hostname = url.hostname.replace(/^\[|\]$/g, "");
-	if (!hostname) throw new Error("Blocked URL: hostname is missing");
-
-	if (isIP(hostname)) {
-		if (isNonPublicAddress(hostname)) {
-			throw new Error("Blocked URL: address is not public");
-		}
-		return url;
-	}
-
-	try {
-		const addresses = await dnsLookup(hostname, { all: true, verbatim: true });
-		if (addresses.length === 0 || addresses.some(({ address }) => isNonPublicAddress(address))) {
-			throw new Error("non-public address");
-		}
-	} catch {
-		throw new Error(`Blocked URL: hostname does not resolve exclusively to public addresses`);
-	}
-
-	return url;
 }
 
 interface PublicFetchResponse {
@@ -217,127 +46,97 @@ interface PublicFetchResponse {
 	url: string;
 }
 
-const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
-
-async function discardResponseBody(response: Response): Promise<void> {
-	try {
-		await response.body?.cancel();
-	} catch {
-		// The response is being discarded; cancellation failure is harmless.
+class ResponseTooLargeError extends Error {
+	constructor(url: string, maxBytes: number) {
+		super(`Response too large (maximum ${Math.round(maxBytes / 1024 / 1024)}MB): ${url}`);
+		this.name = "ResponseTooLargeError";
 	}
 }
 
-async function fetchPublic(
-	url: string,
-	init: RequestInit,
-	signal?: AbortSignal,
-): Promise<PublicFetchResponse> {
-	let currentUrl = url;
-
-	for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount++) {
-		await assertPublicUrl(currentUrl);
-		const response = await fetch(currentUrl, { ...init, redirect: "manual", signal });
-		if (!REDIRECT_STATUSES.has(response.status)) {
-			return { response, url: currentUrl };
-		}
-
-		const location = response.headers.get("location");
-		if (!location) return { response, url: currentUrl };
-		await discardResponseBody(response);
-		if (redirectCount === MAX_REDIRECTS) {
-			throw new Error(`Too many redirects (maximum ${MAX_REDIRECTS})`);
-		}
-
-		const nextUrl = new URL(location, currentUrl).toString();
-		await assertPublicUrl(nextUrl);
-		currentUrl = nextUrl;
-	}
-
-	throw new Error(`Too many redirects (maximum ${MAX_REDIRECTS})`);
-}
-
-async function readResponseBytes(response: Response, maxBytes: number): Promise<Uint8Array> {
-	const contentLength = response.headers.get("content-length");
-	if (contentLength) {
-		const parsedLength = Number.parseInt(contentLength, 10);
-		if (Number.isFinite(parsedLength) && parsedLength > maxBytes) {
-			throw new ResponseTooLargeError(maxBytes);
-		}
-	}
-
+async function readResponseBody(response: Response, maxBytes: number, url: string): Promise<ArrayBuffer> {
 	if (!response.body) {
-		const bytes = new Uint8Array(await response.arrayBuffer());
-		if (bytes.byteLength > maxBytes) throw new ResponseTooLargeError(maxBytes);
-		return bytes;
+		const buffer = await response.arrayBuffer();
+		if (buffer.byteLength > maxBytes) throw new ResponseTooLargeError(url, maxBytes);
+		return buffer;
 	}
 
 	const reader = response.body.getReader();
 	const chunks: Uint8Array[] = [];
-	let totalBytes = 0;
+	let total = 0;
 	try {
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;
-			const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
-			if (totalBytes > maxBytes - chunk.byteLength) {
+			if (!value) continue;
+			total += value.byteLength;
+			if (total > maxBytes) {
 				try {
 					await reader.cancel();
 				} catch {
-					// Preserve the size-limit error.
+					// Preserve the size-limit error if cancellation itself fails.
 				}
-				throw new ResponseTooLargeError(maxBytes);
+				throw new ResponseTooLargeError(url, maxBytes);
 			}
-			chunks.push(chunk);
-			totalBytes += chunk.byteLength;
+			chunks.push(value);
 		}
 	} finally {
 		reader.releaseLock();
 	}
 
-	const result = new Uint8Array(totalBytes);
+	const output = new Uint8Array(total);
 	let offset = 0;
 	for (const chunk of chunks) {
-		result.set(chunk, offset);
+		output.set(chunk, offset);
 		offset += chunk.byteLength;
 	}
-	return result;
+	return output.buffer;
 }
 
-async function readResponseText(response: Response, maxBytes: number): Promise<string> {
-	return new TextDecoder().decode(await readResponseBytes(response, maxBytes));
-}
+async function fetchPublicUrl(
+	inputUrl: string,
+	init: RequestInit,
+	redirects = 0,
+): Promise<PublicFetchResponse> {
+	const url = await assertPublicHttpUrl(inputUrl);
+	const response = await fetch(url, { ...init, redirect: "manual" });
+	if (!REDIRECT_STATUSES.has(response.status)) return { response, url: url.toString() };
 
-function truncateContent(content: string): { content: string; truncated: boolean } {
-	const marker = "\n\n[Output truncated by web_fetch; use a more specific URL or retrieval tool for the remainder.]";
-	if (content.length <= MAX_OUTPUT_CHARS && Buffer.byteLength(content, "utf8") <= MAX_OUTPUT_BYTES) {
-		return { content, truncated: false };
+	const location = response.headers.get("location");
+	if (!location) return { response, url: url.toString() };
+	if (redirects >= MAX_REDIRECTS) {
+		await discardResponseBody(response);
+		throw new Error(`Too many redirects while fetching ${inputUrl}`);
 	}
-
-	const maxHeadChars = Math.max(0, MAX_OUTPUT_CHARS - marker.length);
-	const maxHeadBytes = Math.max(0, MAX_OUTPUT_BYTES - Buffer.byteLength(marker, "utf8"));
-	let low = 0;
-	let high = Math.min(content.length, maxHeadChars);
-	while (low < high) {
-		const middle = Math.ceil((low + high) / 2);
-		if (Buffer.byteLength(content.slice(0, middle), "utf8") <= maxHeadBytes) low = middle;
-		else high = middle - 1;
-	}
-
-	return {
-		content: content.slice(0, low).trimEnd() + marker,
-		truncated: true,
-	};
+	await discardResponseBody(response);
+	const nextUrl = new URL(location, url).toString();
+	return fetchPublicUrl(nextUrl, init, redirects + 1);
 }
 
-function applyOutputLimit(result: FetchResult): FetchResult {
-	if (result.error) return result;
-	const limited = truncateContent(result.content);
-	return {
-		...result,
-		content: limited.content,
-		truncated: limited.truncated,
-		originalChars: result.content.length,
-	};
+function isNonFallbackError(error: string): boolean {
+	return [
+		"Unsupported content type",
+		"Response too large",
+		"Private or local network URLs are not allowed",
+		"URL resolves to a private or local network address",
+		"Could not resolve hostname",
+		"Too many redirects",
+		"Only http:// and https:// URLs are supported",
+		"URLs with embedded credentials are not allowed",
+	].some((prefix) => error.startsWith(prefix));
+}
+
+function limitContent(result: FetchResult): FetchResult {
+	if (result.error || !result.content) return result;
+	const marker = `*[Truncated: content limited to ${DEFAULT_MAX_LINES} lines / ${Math.round(DEFAULT_MAX_BYTES / 1024)}KB]*`;
+	const markerSuffix = `\n\n${marker}`;
+	const truncation = truncateHead(result.content, {
+		// Reserve space for the explanatory marker so the final tool result stays
+		// within Pi's standard line/byte budget, not just the unmarked prefix.
+		maxLines: Math.max(1, DEFAULT_MAX_LINES - 2),
+		maxBytes: Math.max(1, DEFAULT_MAX_BYTES - Buffer.byteLength(markerSuffix, "utf8")),
+	});
+	if (!truncation.truncated) return result;
+	return { ...result, content: truncation.content + markerSuffix };
 }
 
 // ── PDF Extraction ───────────────────────────────────────────────────
@@ -352,13 +151,11 @@ function isPDF(url: string, contentType?: string): boolean {
 }
 
 async function extractPDF(
-	buffer: ArrayBuffer | Uint8Array,
+	buffer: ArrayBuffer,
 	url: string,
 ): Promise<FetchResult> {
 	const { getDocumentProxy } = await import("unpdf");
-	const pdf = await getDocumentProxy(
-		buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer),
-	);
+	const pdf = await getDocumentProxy(new Uint8Array(buffer));
 
 	const metadata = await pdf.getMetadata();
 	const metadataInfo =
@@ -653,16 +450,19 @@ async function extractWithJinaReader(
 	signal?: AbortSignal,
 ): Promise<FetchResult | null> {
 	try {
-		const res = await fetch(JINA_READER_BASE + url, {
+		const fetched = await fetchPublicUrl(JINA_READER_BASE + url, {
 			headers: { Accept: "text/markdown", "X-No-Cache": "true" },
 			signal: AbortSignal.any([
 				AbortSignal.timeout(JINA_TIMEOUT_MS),
 				...(signal ? [signal] : []),
 			]),
 		});
+		const res = fetched.response;
 		if (!res.ok) return null;
 
-		const content = await readResponseText(res, MAX_RESPONSE_SIZE);
+		const content = new TextDecoder().decode(
+			await readResponseBody(res, MAX_RESPONSE_SIZE, fetched.url),
+		);
 		const contentStart = content.indexOf("Markdown Content:");
 		if (contentStart < 0) return null;
 
@@ -697,23 +497,20 @@ async function extractViaHttp(
 	signal?.addEventListener("abort", onAbort);
 
 	try {
-		const fetched = await fetchPublic(
-			url,
-			{
-				headers: {
-					"User-Agent": USER_AGENT,
-					Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-					"Accept-Language": "en-US,en;q=0.9",
-					"Cache-Control": "no-cache",
-					"Sec-Fetch-Dest": "document",
-					"Sec-Fetch-Mode": "navigate",
-					"Sec-Fetch-Site": "none",
-					"Sec-Fetch-User": "?1",
-					"Upgrade-Insecure-Requests": "1",
-				},
+		const fetched = await fetchPublicUrl(url, {
+			signal: controller.signal,
+			headers: {
+				"User-Agent": USER_AGENT,
+				Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+				"Accept-Language": "en-US,en;q=0.9",
+				"Cache-Control": "no-cache",
+				"Sec-Fetch-Dest": "document",
+				"Sec-Fetch-Mode": "navigate",
+				"Sec-Fetch-Site": "none",
+				"Sec-Fetch-User": "?1",
+				"Upgrade-Insecure-Requests": "1",
 			},
-			controller.signal,
-		);
+		});
 		const response = fetched.response;
 		const responseUrl = fetched.url;
 
@@ -730,17 +527,17 @@ async function extractViaHttp(
 		const maxSize = isPDFContent ? MAX_PDF_SIZE : MAX_RESPONSE_SIZE;
 
 		if (contentLengthHeader) {
-			const contentLength = Number.parseInt(contentLengthHeader, 10);
-			if (Number.isFinite(contentLength) && contentLength > maxSize) {
+			const contentLength = parseInt(contentLengthHeader, 10);
+			if (contentLength > maxSize) {
 				return {
 					url: responseUrl, title: "", content: "",
-					error: `Response too large (${Math.ceil(contentLength / 1024 / 1024)}MB)`,
+					error: `Response too large (${Math.round(contentLength / 1024 / 1024)}MB)`,
 				};
 			}
 		}
 
 		if (isPDFContent) {
-			const buffer = await readResponseBytes(response, maxSize);
+			const buffer = await readResponseBody(response, maxSize, responseUrl);
 			return await extractPDF(buffer, responseUrl);
 		}
 
@@ -757,7 +554,9 @@ async function extractViaHttp(
 			};
 		}
 
-		const text = await readResponseText(response, maxSize);
+		const text = new TextDecoder().decode(
+			await readResponseBody(response, maxSize, responseUrl),
+		);
 		const isHTML =
 			contentType.includes("text/html") ||
 			contentType.includes("application/xhtml+xml");
@@ -794,7 +593,7 @@ async function extractViaHttp(
 			};
 		}
 
-		const markdown = turndown.turndown(article.content);
+		const markdown = turndown.turndown(article.content ?? "");
 
 		if (markdown.length < MIN_USEFUL_CONTENT) {
 			return {
@@ -832,29 +631,28 @@ async function fetchAndExtract(
 		return { url, title: "", content: "", error: "Aborted" };
 	}
 
+	let publicUrl: URL;
 	try {
-		await assertPublicUrl(url);
-	} catch (err) {
-		const message = err instanceof Error ? err.message : String(err);
-		return { url, title: "", content: "", error: message };
+		publicUrl = await assertPublicHttpUrl(url);
+	} catch (error) {
+		return {
+			url,
+			title: "",
+			content: "",
+			error: error instanceof Error ? error.message : String(error),
+		};
 	}
+	const normalizedUrl = publicUrl.toString();
 
-	const httpResult = await extractViaHttp(url, signal);
+	const httpResult = await extractViaHttp(normalizedUrl, signal);
 	if (signal?.aborted)
 		return { url, title: "", content: "", error: "Aborted" };
-	if (!httpResult.error) return applyOutputLimit(httpResult);
+	if (!httpResult.error) return limitContent(httpResult);
 
-	if (
-		httpResult.error.startsWith("Unsupported content type") ||
-		httpResult.error.startsWith("Response too large") ||
-		httpResult.error.startsWith("Blocked URL") ||
-		httpResult.error.startsWith("Too many redirects")
-	) {
-		return httpResult;
-	}
+	if (isNonFallbackError(httpResult.error)) return httpResult;
 
-	const jinaResult = await extractWithJinaReader(url, signal);
-	if (jinaResult) return applyOutputLimit(jinaResult);
+	const jinaResult = await extractWithJinaReader(normalizedUrl, signal);
+	if (jinaResult) return limitContent(jinaResult);
 	if (signal?.aborted)
 		return { url, title: "", content: "", error: "Aborted" };
 
@@ -871,9 +669,9 @@ export default function (pi: ExtensionAPI) {
 		name: "web_fetch",
 		label: "Web Fetch",
 		description:
-			"Fetch a public web page and extract readable content as clean markdown. Uses Readability + Turndown for high-quality HTML→markdown conversion. Handles PDFs, plain text, and falls back to Jina Reader for JS-rendered pages. Local, private, and reserved network addresses are blocked; response bodies and tool output are bounded.",
+			"Fetch a public web page and extract readable content as clean markdown. Uses Readability + Turndown for high-quality HTML→markdown conversion. Handles PDFs, plain text, and falls back to Jina Reader for JS-rendered pages. Rejects local/private destinations and limits returned content to Pi's standard 2,000-line / 50KB tool-output budget.",
 		promptSnippet:
-			"Fetch a public HTTP(S) URL and extract readable content as markdown. Supports HTML pages, PDFs, and plain text.",
+			"Fetch a public URL and extract readable content as markdown. Supports HTML pages, PDFs, and plain text; local/private destinations and oversized outputs are rejected or bounded.",
 
 		parameters: Type.Object({
 			url: Type.String({ description: "URL to fetch" }),
@@ -900,8 +698,6 @@ export default function (pi: ExtensionAPI) {
 					url: result.url,
 					title: result.title,
 					chars: result.content.length,
-					originalChars: result.originalChars ?? result.content.length,
-					truncated: result.truncated ?? false,
 				},
 			};
 		},
@@ -939,7 +735,7 @@ export default function (pi: ExtensionAPI) {
 
 			if (context.isError) {
 				const msg =
-					result.content?.find((c) => c.type === "text")?.text ||
+					result.content.find((c) => c.type === "text")?.text ||
 					"Error";
 				text.setText(theme.fg("error", msg));
 				return text;
@@ -948,18 +744,13 @@ export default function (pi: ExtensionAPI) {
 			const details = result.details as {
 				title?: string;
 				chars?: number;
-				originalChars?: number;
-				truncated?: boolean;
 			};
 
 			const title = details?.title || "Untitled";
 			const chars = details?.chars ?? 0;
-			const truncationNote = details?.truncated
-				? `; truncated from ${details.originalChars ?? "more"} chars`
-				: "";
 			const status =
 				theme.fg("success", title) +
-				theme.fg("muted", ` (${chars} chars${truncationNote})`);
+				theme.fg("muted", ` (${chars} chars)`);
 
 			if (!expanded) {
 				text.setText(status);
