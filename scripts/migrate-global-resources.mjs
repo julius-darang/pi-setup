@@ -25,6 +25,7 @@ const DUPLICATE_RESOURCES = [
 	"skills/marp-output",
 	"skills/pandapower-analysis",
 	"skills/send-email",
+	"skills/stop-slop",
 ];
 
 function parseArgs(argv) {

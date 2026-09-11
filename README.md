@@ -27,6 +27,7 @@ This repository is a **capability layer**, not a complete Pi installation. It ad
 | `pandapower-analysis` | Run preliminary load flow, load-profile, and IEC 60909 short-circuit studies |
 | `pandoc-pdf` | Produce flowing book-like PDFs with Pandoc and XeLaTeX |
 | `send-email` | Compose, preview, and explicitly confirm Gmail SMTP messages |
+| `stop-slop` | Remove predictable AI writing patterns from prose |
 | `tutorial-content` | Structure canonical long-form tutorial content |
 | `visual-style` | Reuse a named visual system for figures and decks |
 
@@ -89,7 +90,7 @@ npm run migration:report
 node scripts/migrate-global-resources.mjs --apply
 ```
 
-The migration moves only the overlapping extension and skill paths into a dated backup; it leaves unrelated resources such as `stop-slop` in place. It restores the private email `.env` and recipient files to the stable config path (with mode `600`) so moving the duplicate skill code does not disable email. Use the dry-run output and keep the backup until the package has loaded successfully.
+The migration moves only the overlapping extension and skill paths into a dated backup; unrelated resources remain in place. It restores the private email `.env` and recipient files to the stable config path (with mode `600`) so moving the duplicate skill code does not disable email. Use the dry-run output and keep the backup until the package has loaded successfully.
 
 Restart Pi or run `/reload` after installation.
 
