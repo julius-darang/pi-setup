@@ -15,6 +15,7 @@ This repository is a **capability layer**, not a complete Pi installation. It ad
 | `context` | `/context`, a context-window usage view |
 | `custom-header` | A customizable startup header |
 | `filechanges` | `/filechanges` and reversible `edit`/`write` tracking |
+| `prompt-snippets` | Toggleable per-message prompt rules through `/snippets` or `alt+s` |
 | `subagents` | `scout`, `researcher`, and `worker` agents through one `subagent` tool |
 | `web-fetch` | Readable extraction from one webpage or PDF |
 
@@ -22,6 +23,7 @@ This repository is a **capability layer**, not a complete Pi installation. It ad
 
 | Skill | Purpose |
 |---|---|
+| `analyze-sessions` | Read-only cost, prompt, error, search, and transcript reports |
 | `marp-output` | Author, render, and validate Marp decks |
 | `ffmpeg-output` | Stitch images or rendered Marp slides into silent MP4 clips |
 | `pandapower-analysis` | Run preliminary load flow, load-profile, and IEC 60909 short-circuit studies |
@@ -37,7 +39,7 @@ The `researcher` subagent also uses the separately installed `pi-web-access` pac
 
 - Pi Coding Agent 0.84.4 (the package currently targets the 0.84.x API)
 - Node.js 22.19 or newer and npm
-- Python 3 for the optional `send-email` helper
+- Python 3 for the optional `send-email` helper and `analyze-sessions` reports
 - A configured Pi provider or subscription
 - Optional: `pi-web-access` for the researcher agent
 - Optional: Pandoc and XeLaTeX for `pandoc-pdf`
@@ -120,6 +122,29 @@ cp settings.example.json ~/.pi/agent/settings.example.json
 ```
 
 Do not copy credentials into the repository. Pi authentication belongs in Pi's normal auth flow (`/login`) or in the user's local environment.
+
+### Prompt snippets
+
+The `prompt-snippets` extension provides temporary, per-message behavior rules:
+
+```text
+/snippets       # open the toggle menu
+alt+s           # keyboard shortcut
+```
+
+Packaged snippets are shared with the setup. Personal snippets can be added
+under `$PI_CODING_AGENT_DIR/prompt-snippets/` (default:
+`~/.pi/agent/prompt-snippets/`). A personal file with the same filename
+overrides the packaged version. Snippet selections reset after each message
+and are not persisted as conversation instructions.
+
+### Session analysis
+
+The `analyze-sessions` skill reads Pi's JSONL sessions without modifying them.
+It honors `PI_CODING_AGENT_DIR`, redacts common credential-shaped values from
+printed prompt/transcript content by default, and supports `--include-sensitive`
+only for local inspection. Keep reports narrow because sessions may contain
+private prompts, source code, and tool output.
 
 ### Subagent models
 
