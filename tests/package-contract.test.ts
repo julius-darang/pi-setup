@@ -34,6 +34,10 @@ test("npm package contains the helper but not private email configuration", () =
 	assert.equal(files.has("skills/send-email/scripts/send_gmail_smtp.py"), true);
 	assert.equal(files.has("skills/send-email/SKILL.md"), true);
 	assert.equal(files.has("skills/stop-slop/SKILL.md"), true);
+	assert.equal(files.has("extensions/prompt-snippets/index.ts"), true);
+	assert.equal(files.has("extensions/prompt-snippets/snippets/concise.md"), true);
+	assert.equal(files.has("skills/analyze-sessions/SKILL.md"), true);
+	assert.equal(files.has("skills/analyze-sessions/scripts/sessions.py"), true);
 	for (const privatePath of [
 		"skills/send-email/.env",
 		"skills/send-email/recipients.txt",
